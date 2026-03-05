@@ -7,6 +7,10 @@ export const fileService = {
     return getStorageAdapter().getFilesByFolder(folderId)
   },
 
+  async getFilesByOwner(ownerId: string): Promise<FileMetadata[]> {
+    return getStorageAdapter().getFilesByOwner(ownerId)
+  },
+
   async getFile(id: string): Promise<FileRecord | null> {
     return getStorageAdapter().getFileById(id)
   },

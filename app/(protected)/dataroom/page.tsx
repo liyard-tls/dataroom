@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -19,17 +19,20 @@ import { ThemeToggle } from '@/components/common/ThemeToggle'
 import { buildBreadcrumb } from '@/modules/folders/services/folder.service'
 import { useFileStore } from '@/store/fileStore'
 import { authService } from '@/modules/auth'
+import { fileService } from '@/modules/files/services/file.service'
 import { Button } from '@/components/ui/button'
 import { PanelLeftOpen } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
 import { useAuthStore } from '@/store/authStore'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { FileMetadata } from '@/types/file.types'
 
 function DataRoomApp() {
   const router = useRouter()
   const { isSidebarCollapsed, toggleSidebar } = useUIStore()
   const user = useAuthStore((state) => state.user)
+  const [allFiles, setAllFiles] = useState<FileMetadata[]>([])
   const {
     folders,
     currentFolderId,
@@ -60,6 +63,22 @@ function DataRoomApp() {
 
   // Reload files when current folder changes
   useEffect(() => { loadFiles() }, [loadFiles, currentFolderId])
+
+  const loadAllFiles = useCallback(async () => {
+    if (!user) {
+      setAllFiles([])
+      return
+    }
+    const data = await fileService.getFilesByOwner(user.uid)
+    setAllFiles(data)
+  }, [user])
+
+  // Keep sidebar/main panel folder metadata in sync with file changes across the tree
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadAllFiles()
+    })
+  }, [loadAllFiles, files, folders])
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId)
 
@@ -112,7 +131,9 @@ function DataRoomApp() {
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebar={toggleSidebar}
             user={user}
+            files={allFiles}
             onUploadFiles={uploadFiles}
+            onOpenFile={openFile}
             onSignOut={handleSignOut}
           />
         </div>
@@ -134,6 +155,7 @@ function DataRoomApp() {
             <MainPanel
               files={files}
               folders={folders}
+              allFiles={allFiles}
               currentFolderId={currentFolderId}
               selectedIds={selectedIds}
               isLoading={filesLoading || foldersLoading}

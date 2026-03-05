@@ -11,13 +11,14 @@ import { FileType } from '@/types/file.types'
 import { cn } from '@/lib/utils'
 
 interface FileIconProps {
-  type: FileType | 'folder'
+  type: FileType | 'folder' | 'folder-filled'
   className?: string
   size?: number
 }
 
-const iconConfig: Record<FileType | 'folder', { icon: React.ElementType; color: string }> = {
+const iconConfig: Record<FileType | 'folder' | 'folder-filled', { icon: React.ElementType; color: string }> = {
   folder: { icon: Folder, color: 'text-yellow-500' },
+  'folder-filled': { icon: Folder, color: 'text-yellow-500' },
   pdf:    { icon: FileText, color: 'text-red-500' },
   image:  { icon: FileImage, color: 'text-green-500' },
   video:  { icon: FileVideo, color: 'text-blue-500' },
@@ -28,5 +29,10 @@ const iconConfig: Record<FileType | 'folder', { icon: React.ElementType; color: 
 
 export function FileIcon({ type, className, size = 20 }: FileIconProps) {
   const { icon: Icon, color } = iconConfig[type] ?? iconConfig.other
-  return <Icon size={size} className={cn(color, className)} />
+  return (
+    <Icon
+      size={size}
+      className={cn(color, type === 'folder-filled' && 'fill-yellow-500/35', className)}
+    />
+  )
 }

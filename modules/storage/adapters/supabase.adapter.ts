@@ -48,6 +48,10 @@ export class SupabaseAdapter implements StorageAdapter {
     throw new Error('SupabaseAdapter not implemented.')
   }
 
+  async getFilesByOwner(_ownerId: string): Promise<FileMetadata[]> {
+    throw new Error('SupabaseAdapter not implemented.')
+  }
+
   async getFileById(_id: string): Promise<FileRecord | null> {
     throw new Error('SupabaseAdapter not implemented.')
   }

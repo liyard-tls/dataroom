@@ -24,6 +24,7 @@ import {
 interface MainPanelProps {
   files: FileMetadata[]
   folders: Folder[]
+  allFiles: FileMetadata[]
   currentFolderId: string | null
   selectedIds: Set<string>
   isLoading: boolean
@@ -72,6 +73,7 @@ function EmptyState({ onUpload }: { onUpload: (files: File[]) => void }) {
 
 function FolderRow({
   folder,
+  isNotEmpty,
   isSelected,
   onSelect,
   onOpen,
@@ -79,6 +81,7 @@ function FolderRow({
   onDelete,
 }: {
   folder: Folder
+  isNotEmpty: boolean
   isSelected: boolean
   onSelect: () => void
   onOpen: () => void
@@ -121,7 +124,7 @@ function FolderRow({
       </div>
 
       <div className={cn('flex items-center gap-2 overflow-hidden', COL_NAME)}>
-        <FileIcon type="folder" size={18} className="shrink-0" />
+        <FileIcon type={isNotEmpty ? 'folder-filled' : 'folder'} size={20} className="shrink-0" />
         {isRenaming ? (
           <input
             autoFocus
@@ -289,6 +292,7 @@ function FileRow({
 export function MainPanel({
   files,
   folders,
+  allFiles,
   currentFolderId,
   selectedIds,
   isLoading,
@@ -433,6 +437,10 @@ export function MainPanel({
                 <FolderRow
                   key={folder.id}
                   folder={folder}
+                  isNotEmpty={
+                    folders.some((candidate) => candidate.parentId === folder.id) ||
+                    allFiles.some((file) => file.folderId === folder.id)
+                  }
                   isSelected={selectedIds.has(folder.id)}
                   onSelect={() => onToggleSelect(folder.id)}
                   onOpen={() => onFolderOpen(folder.id)}

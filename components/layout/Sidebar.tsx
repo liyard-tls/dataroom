@@ -17,6 +17,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { motion, AnimatePresence } from "framer-motion";
 import { Folder } from "@/types/folder.types";
 import { AuthUser } from "@/types/auth.types";
+import { FileMetadata } from "@/types/file.types";
 import { FileIcon } from "@/components/common/FileIcon";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,30 +33,36 @@ interface SidebarProps {
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   user: AuthUser | null;
+  files: FileMetadata[];
   onUploadFiles: (files: File[]) => void;
+  onOpenFile: (id: string) => void;
   onSignOut: () => void;
 }
 
 interface FolderNodeProps {
   folder: Folder;
   allFolders: Folder[];
+  allFiles: FileMetadata[];
   currentFolderId: string | null;
   depth: number;
   onNavigate: (id: string | null) => void;
   onCreateFolder: (name: string, parentId: string | null) => void;
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
+  onOpenFile: (id: string) => void;
 }
 
 function FolderNode({
   folder,
   allFolders,
+  allFiles,
   currentFolderId,
   depth,
   onNavigate,
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
+  onOpenFile,
 }: FolderNodeProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -63,6 +70,8 @@ function FolderNode({
   const [inputValue, setInputValue] = useState("");
 
   const children = allFolders.filter((f) => f.parentId === folder.id);
+  const filesInFolder = allFiles.filter((f) => f.folderId === folder.id);
+  const hasContent = children.length > 0 || filesInFolder.length > 0;
   const isActive = currentFolderId === folder.id;
 
   // Makes this folder a drop target for DnD file/folder moves
@@ -97,7 +106,7 @@ function FolderNode({
     <div ref={setNodeRef}>
       <div
         className={cn(
-          "group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors",
+          "group flex items-center gap-1 rounded-md px-3 py-2 text-base transition-colors",
           isActive && "bg-primary/10 text-primary font-medium",
           !isActive && "hover:bg-accent cursor-pointer",
           isOver && "bg-primary/20 ring-1 ring-primary",
@@ -109,14 +118,10 @@ function FolderNode({
           onClick={() => setIsExpanded((v) => !v)}
           className="flex-shrink-0 p-0.5 text-muted-foreground hover:text-foreground"
         >
-          {children.length > 0 ? (
-            isExpanded ? (
-              <ChevronDown size={12} />
-            ) : (
-              <ChevronRight size={12} />
-            )
+          {hasContent && isExpanded ? (
+            <ChevronDown size={14} />
           ) : (
-            <span className="w-3" />
+            <ChevronRight size={14} />
           )}
         </button>
 
@@ -142,7 +147,10 @@ function FolderNode({
               className="flex flex-1 items-center gap-2 overflow-hidden"
               onClick={() => onNavigate(folder.id)}
             >
-              <FileIcon type="folder" size={14} />
+              <FileIcon
+                type={hasContent ? "folder-filled" : "folder"}
+                size={18}
+              />
               <span className="truncate">{folder.name}</span>
             </button>
 
@@ -189,14 +197,14 @@ function FolderNode({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="overflow-hidden"
+            className="ml-4 overflow-hidden border-l border-border/70"
           >
             {isCreating && (
               <div
-                className="flex items-center gap-1 px-2 py-1"
-                style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}
+                className="flex items-center gap-2 px-3 py-1.5"
+                style={{ paddingLeft: `${(depth + 1) * 12 + 12}px` }}
               >
-                <FileIcon type="folder" size={14} />
+                <FileIcon type="folder" size={16} />
                 <Input
                   autoFocus
                   placeholder="Folder name"
@@ -218,13 +226,37 @@ function FolderNode({
                 key={child.id}
                 folder={child}
                 allFolders={allFolders}
+                allFiles={allFiles}
                 currentFolderId={currentFolderId}
                 depth={depth + 1}
                 onNavigate={onNavigate}
                 onCreateFolder={onCreateFolder}
                 onRenameFolder={onRenameFolder}
                 onDeleteFolder={onDeleteFolder}
+                onOpenFile={onOpenFile}
               />
+            ))}
+            {!isCreating && children.length === 0 && filesInFolder.length === 0 && (
+              <div
+                className="px-3 py-1.5 text-sm italic text-muted-foreground"
+                style={{ paddingLeft: `${(depth + 1) * 12 + 32}px` }}
+              >
+                Folder is empty
+              </div>
+            )}
+            {filesInFolder.map((file) => (
+              <button
+                key={file.id}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-base transition-colors hover:bg-accent",
+                  "text-foreground",
+                )}
+                style={{ paddingLeft: `${(depth + 1) * 12 + 32}px` }}
+                onClick={() => onOpenFile(file.id)}
+              >
+                <FileIcon type={file.type} size={18} />
+                <span className="truncate">{file.name}</span>
+              </button>
             ))}
           </motion.div>
         )}
@@ -242,7 +274,9 @@ export function Sidebar({
   onDeleteFolder,
   onToggleSidebar,
   user,
+  files,
   onUploadFiles,
+  onOpenFile,
   onSignOut,
 }: SidebarProps) {
   const [isCreatingRoot, setIsCreatingRoot] = useState(false);
@@ -295,13 +329,13 @@ export function Sidebar({
         </Button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-5 pb-4">
+      <div className="flex flex-1 flex-col gap-8 overflow-y-auto px-5 pb-4">
         {/* Quick actions */}
         <div>
           <span className="text-sm font-medium tracking-wide text-muted-foreground">
             Quick Actions
           </span>
-          <div className="mt-4 space-y-2">
+          <div className="mt-5 space-y-2">
             <input
               ref={uploadInputRef}
               type="file"
@@ -338,7 +372,7 @@ export function Sidebar({
           <span className="text-sm font-medium tracking-wide text-muted-foreground">
             Favorites
           </span>
-          <div className="mt-4">
+          <div className="mt-5">
             <Button
               variant="outline"
               disabled
@@ -354,7 +388,7 @@ export function Sidebar({
           <button
             ref={setRootRef}
             className={cn(
-              "mb-4 block w-full rounded-md px-1 py-1 text-left text-sm font-medium tracking-wide text-muted-foreground transition-colors",
+              "mb-5 block w-full rounded-md px-1 py-1 text-left text-sm font-medium tracking-wide text-muted-foreground transition-colors",
               "hover:text-foreground",
               isRootOver && "bg-accent/60 ring-1 ring-border",
             )}
@@ -390,12 +424,14 @@ export function Sidebar({
               key={folder.id}
               folder={folder}
               allFolders={folders}
+              allFiles={files}
               currentFolderId={currentFolderId}
               depth={0}
               onNavigate={onNavigate}
               onCreateFolder={onCreateFolder}
               onRenameFolder={onRenameFolder}
               onDeleteFolder={onDeleteFolder}
+              onOpenFile={onOpenFile}
             />
           ))}
         </div>

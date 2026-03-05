@@ -129,6 +129,12 @@ export class IndexedDBAdapter implements StorageAdapter {
     return files.map(({ blob: _blob, ...metadata }) => metadata)
   }
 
+  async getFilesByOwner(ownerId: string): Promise<FileMetadata[]> {
+    const db = await getDB()
+    const files = await db.getAllFromIndex('files', 'by-owner', ownerId)
+    return files.map(({ blob: _blob, ...metadata }) => metadata)
+  }
+
   async getFileById(id: string): Promise<FileRecord | null> {
     const db = await getDB()
     return (await db.get('files', id)) ?? null
