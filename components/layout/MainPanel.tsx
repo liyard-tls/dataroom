@@ -3,12 +3,13 @@
 import { useState, useCallback } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, Trash2, ArrowUpDown } from 'lucide-react'
+import { Upload, Trash2, ArrowUpDown, MoreHorizontal, FolderOpen, Pencil, Eye } from 'lucide-react'
 import { FileMetadata } from '@/types/file.types'
 import { Folder } from '@/types/folder.types'
 import { FileIcon } from '@/components/common/FileIcon'
 import { Breadcrumb } from './Breadcrumb'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { formatFileSize } from '@/lib/fileHelpers'
 import { useFileStore, SortField, SortDirection } from '@/store/fileStore'
 import { cn } from '@/lib/utils'
@@ -16,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
@@ -41,23 +43,137 @@ interface MainPanelProps {
   onClearSelection: () => void
 }
 
+// Shared column widths — identical in header and every row
+const COL_NAME = 'flex-1 min-w-0'
+const COL_SIZE = 'w-24 shrink-0 text-right'
+const COL_DATE = 'w-36 shrink-0 text-right'
+// Actions column always takes up space so rows never shift when menu opens/closes
+const COL_ACTIONS = 'w-7 shrink-0'
+const ROW_PX = 'px-3'
+
+function stopRowPropagation(e: React.SyntheticEvent) {
+  e.stopPropagation()
+}
+
 function EmptyState({ onUpload }: { onUpload: (files: File[]) => void }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
+    <div className="flex h-full flex-col items-center justify-center gap-4 text-muted-foreground">
       <Upload size={40} className="opacity-30" />
       <p className="text-sm">Drop files here or click Upload</p>
       <label>
-        <input
-          type="file"
-          multiple
-          className="sr-only"
-          onChange={(e) => e.target.files && onUpload(Array.from(e.target.files))}
-        />
+        <input type="file" multiple className="sr-only" onChange={(e) => e.target.files && onUpload(Array.from(e.target.files))} />
         <Button variant="outline" className="cursor-pointer" asChild>
           <span>Upload files</span>
         </Button>
       </label>
     </div>
+  )
+}
+
+function FolderRow({
+  folder,
+  isSelected,
+  onSelect,
+  onOpen,
+  onRename,
+  onDelete,
+}: {
+  folder: Folder
+  isSelected: boolean
+  onSelect: () => void
+  onOpen: () => void
+  onRename: (name: string) => void
+  onDelete: () => void
+}) {
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [nameValue, setNameValue] = useState(folder.name)
+
+  function handleRenameSubmit() {
+    const trimmed = nameValue.trim()
+    if (trimmed && trimmed !== folder.name) onRename(trimmed)
+    setIsRenaming(false)
+  }
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className={cn(
+        'group flex items-center gap-3 rounded-lg py-2 transition-colors',
+        ROW_PX,
+        isSelected ? 'bg-primary/10' : 'hover:bg-accent',
+      )}
+      onDoubleClick={onOpen}
+    >
+      <div
+        className="flex w-6 shrink-0 items-center justify-center"
+        onClick={stopRowPropagation}
+        onPointerDown={stopRowPropagation}
+        onDoubleClick={stopRowPropagation}
+      >
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={onSelect}
+          className={cn(isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}
+        />
+      </div>
+
+      <div className={cn('flex items-center gap-2 overflow-hidden', COL_NAME)}>
+        <FileIcon type="folder" size={18} className="shrink-0" />
+        {isRenaming ? (
+          <input
+            autoFocus
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            onBlur={handleRenameSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRenameSubmit()
+              if (e.key === 'Escape') { setIsRenaming(false); setNameValue(folder.name) }
+            }}
+            className="flex-1 rounded border border-primary bg-background px-1 text-sm outline-none"
+            onClick={stopRowPropagation}
+          />
+        ) : (
+          <span className="truncate text-sm">{folder.name}</span>
+        )}
+      </div>
+
+      <span className={cn('text-xs text-muted-foreground', COL_SIZE)}>—</span>
+      <span className={cn('text-xs text-muted-foreground', COL_DATE)}>
+        {new Date(folder.createdAt).toLocaleDateString()}
+      </span>
+
+      <div className={COL_ACTIONS}>
+        {/* modal=false prevents Radix from adding padding-right to body on open */}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
+              onClick={stopRowPropagation}
+              onDoubleClick={stopRowPropagation}
+            >
+              <MoreHorizontal size={15} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={onOpen}>
+              <FolderOpen size={14} className="mr-2" /> Open
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setIsRenaming(true); setNameValue(folder.name) }}>
+              <Pencil size={14} className="mr-2" /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+              <Trash2 size={14} className="mr-2" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </motion.div>
   )
 }
 
@@ -80,35 +196,38 @@ function FileRow({
   const [nameValue, setNameValue] = useState(file.name)
 
   function handleRenameSubmit() {
-    if (nameValue.trim() && nameValue !== file.name) {
-      onRename(nameValue.trim())
-    }
+    const trimmed = nameValue.trim()
+    if (trimmed && trimmed !== file.name) onRename(trimmed)
     setIsRenaming(false)
   }
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       className={cn(
-        'group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors',
-        isSelected ? 'bg-primary/10' : 'hover:bg-accent'
+        'group flex items-center gap-3 rounded-lg py-2 transition-colors',
+        ROW_PX,
+        isSelected ? 'bg-primary/10' : 'hover:bg-accent',
       )}
+      onDoubleClick={onOpen}
     >
-      {/* Checkbox */}
-      <input
-        type="checkbox"
-        checked={isSelected}
-        onChange={onSelect}
-        className="accent-primary"
-        onClick={(e) => e.stopPropagation()}
-      />
+      <div
+        className="flex w-6 shrink-0 items-center justify-center"
+        onClick={stopRowPropagation}
+        onPointerDown={stopRowPropagation}
+        onDoubleClick={stopRowPropagation}
+      >
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={onSelect}
+          className={cn(isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}
+        />
+      </div>
 
-      <button className="flex flex-1 items-center gap-3 overflow-hidden text-left" onDoubleClick={onOpen}>
-        <FileIcon type={file.type} size={18} className="flex-shrink-0" />
-
+      <div className={cn('flex items-center gap-2 overflow-hidden', COL_NAME)}>
+        <FileIcon type={file.type} size={18} className="shrink-0" />
         {isRenaming ? (
           <input
             autoFocus
@@ -120,40 +239,48 @@ function FileRow({
               if (e.key === 'Escape') { setIsRenaming(false); setNameValue(file.name) }
             }}
             className="flex-1 rounded border border-primary bg-background px-1 text-sm outline-none"
+            onClick={stopRowPropagation}
           />
         ) : (
-          <span className="flex-1 truncate text-sm">{file.name}</span>
+          <span className="truncate text-sm">{file.name}</span>
         )}
+      </div>
 
-        <span className="hidden text-xs text-muted-foreground md:block">{formatFileSize(file.size)}</span>
-        <span className="hidden text-xs text-muted-foreground lg:block">
-          {new Date(file.createdAt).toLocaleDateString()}
-        </span>
-      </button>
+      <span className={cn('text-xs text-muted-foreground', COL_SIZE)}>
+        {formatFileSize(file.size)}
+      </span>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpen} title="Open">
-          <FileIcon type={file.type} size={14} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => setIsRenaming(true)}
-          title="Rename"
-        >
-          ✎
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 hover:text-destructive"
-          onClick={onDelete}
-          title="Delete"
-        >
-          <Trash2 size={14} />
-        </Button>
+      <span className={cn('text-xs text-muted-foreground', COL_DATE)}>
+        {new Date(file.createdAt).toLocaleDateString()}
+      </span>
+
+      <div className={COL_ACTIONS}>
+        {/* modal=false prevents Radix from adding padding-right to body on open */}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
+              onClick={stopRowPropagation}
+              onDoubleClick={stopRowPropagation}
+            >
+              <MoreHorizontal size={15} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={onOpen}>
+              <Eye size={14} className="mr-2" /> Open
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setIsRenaming(true); setNameValue(file.name) }}>
+              <Pencil size={14} className="mr-2" /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+              <Trash2 size={14} className="mr-2" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </motion.div>
   )
@@ -175,9 +302,9 @@ export function MainPanel({
   onFolderOpen,
   onFolderRename,
   onFolderDelete,
-  onFolderCreate,
+  onFolderCreate: _onFolderCreate,
   onToggleSelect,
-  onSelectAll,
+  onSelectAll: _onSelectAll,
   onClearSelection,
 }: MainPanelProps) {
   const { setSorting, sortField, sortDirection } = useFileStore()
@@ -188,7 +315,10 @@ export function MainPanel({
   const childFolders = folders.filter((f) => f.parentId === currentFolderId)
   const isEmpty = files.length === 0 && childFolders.length === 0
 
-  // Handle native browser file drag (from OS desktop)
+  const totalItems = files.length + childFolders.length
+  const allSelected = totalItems > 0 && selectedIds.size === totalItems
+  const someSelected = selectedIds.size > 0 && !allSelected
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (e.dataTransfer.types.includes('Files')) {
       e.preventDefault()
@@ -199,9 +329,7 @@ export function MainPanel({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
-    if (e.dataTransfer.files.length > 0) {
-      onUpload(Array.from(e.dataTransfer.files))
-    }
+    if (e.dataTransfer.files.length > 0) onUpload(Array.from(e.dataTransfer.files))
   }, [onUpload])
 
   function handleSortChange(field: SortField) {
@@ -213,8 +341,8 @@ export function MainPanel({
     <div
       ref={setNodeRef}
       className={cn(
-        'flex h-full flex-col transition-colors',
-        isDragOver && 'bg-primary/5 ring-2 ring-inset ring-primary/30'
+        'relative flex h-full flex-col transition-colors',
+        isDragOver && 'bg-primary/5 ring-2 ring-inset ring-primary/30',
       )}
       onDragOver={handleDragOver}
       onDragLeave={() => setIsDragOver(false)}
@@ -232,7 +360,7 @@ export function MainPanel({
             </Button>
           )}
 
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <ArrowUpDown size={14} className="mr-1" />
@@ -253,40 +381,43 @@ export function MainPanel({
           </DropdownMenu>
 
           <label>
-            <input
-              type="file"
-              multiple
-              className="sr-only"
-              onChange={(e) => e.target.files && onUpload(Array.from(e.target.files))}
-            />
+            <input type="file" multiple className="sr-only" onChange={(e) => e.target.files && onUpload(Array.from(e.target.files))} />
             <Button size="sm" className="cursor-pointer" asChild>
-              <span>
-                <Upload size={14} className="mr-1" />
-                Upload
-              </span>
+              <span><Upload size={14} className="mr-1" />Upload</span>
             </Button>
           </label>
         </div>
       </div>
 
-      {/* Column headers */}
+      {/* Column headers — px, gap identical to rows */}
       {!isEmpty && (
-        <div className="flex items-center gap-3 border-b px-6 py-1.5 text-xs font-medium text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={selectedIds.size === files.length && files.length > 0}
-            onChange={() => selectedIds.size === files.length ? onClearSelection() : onSelectAll()}
-            className="accent-primary"
-          />
-          <span className="flex-1">Name</span>
-          <span className="hidden w-20 text-right md:block">Size</span>
-          <span className="hidden w-24 text-right lg:block">Created</span>
-          <span className="w-24" />
+        <div className={cn('flex items-center gap-3 border-b bg-muted/30 py-1.5 text-xs font-medium text-muted-foreground', ROW_PX)}>
+          <div
+            className="flex w-6 shrink-0 items-center justify-center"
+            onClick={stopRowPropagation}
+            onPointerDown={stopRowPropagation}
+          >
+            <Checkbox
+              checked={someSelected ? 'indeterminate' : allSelected}
+              onCheckedChange={() => {
+                if (allSelected) {
+                  onClearSelection()
+                } else {
+                  const allIds = [...files.map((f) => f.id), ...childFolders.map((f) => f.id)]
+                  allIds.forEach((id) => { if (!selectedIds.has(id)) onToggleSelect(id) })
+                }
+              }}
+            />
+          </div>
+          <span className={COL_NAME}>Name</span>
+          <span className={COL_SIZE}>Size</span>
+          <span className={COL_DATE}>Created</span>
+          <span className={COL_ACTIONS} />
         </div>
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto py-1">
         {isLoading && (
           <div className="flex h-32 items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -297,51 +428,20 @@ export function MainPanel({
 
         {!isLoading && !isEmpty && (
           <>
-            {/* Sub-folders */}
             <AnimatePresence>
               {childFolders.map((folder) => (
-                <motion.div
+                <FolderRow
                   key={folder.id}
-                  layout
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="group flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-accent"
-                >
-                  <span className="w-4" />
-                  <button
-                    className="flex flex-1 items-center gap-3 overflow-hidden"
-                    onDoubleClick={() => onFolderOpen(folder.id)}
-                  >
-                    <FileIcon type="folder" size={18} className="flex-shrink-0" />
-                    <span className="flex-1 truncate text-sm">{folder.name}</span>
-                  </button>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => {
-                        const name = window.prompt('Rename folder', folder.name)
-                        if (name) onFolderRename(folder.id, name)
-                      }}
-                    >
-                      ✎
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 hover:text-destructive"
-                      onClick={() => onFolderDelete(folder.id)}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </motion.div>
+                  folder={folder}
+                  isSelected={selectedIds.has(folder.id)}
+                  onSelect={() => onToggleSelect(folder.id)}
+                  onOpen={() => onFolderOpen(folder.id)}
+                  onRename={(name) => onFolderRename(folder.id, name)}
+                  onDelete={() => onFolderDelete(folder.id)}
+                />
               ))}
             </AnimatePresence>
 
-            {/* Files */}
             <AnimatePresence>
               {files.map((file) => (
                 <FileRow
@@ -359,7 +459,6 @@ export function MainPanel({
         )}
       </div>
 
-      {/* Drop overlay hint */}
       {isDragOver && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="rounded-xl bg-background/90 px-6 py-3 text-sm font-medium shadow-lg ring-1 ring-primary">

@@ -3,7 +3,7 @@ import { FileCreateInput, FileMetadata, FileRecord, FileUpdateInput } from '@/ty
 import { getFileType, validateFileSize } from '@/lib/fileHelpers'
 
 export const fileService = {
-  async getFiles(folderId: string): Promise<FileMetadata[]> {
+  async getFiles(folderId: string | null): Promise<FileMetadata[]> {
     return getStorageAdapter().getFilesByFolder(folderId)
   },
 
@@ -12,7 +12,7 @@ export const fileService = {
   },
 
   /** Validates and uploads a browser File object into the data room */
-  async uploadFile(file: File, folderId: string, ownerId: string): Promise<FileRecord> {
+  async uploadFile(file: File, folderId: string | null, ownerId: string): Promise<FileRecord> {
     const sizeCheck = validateFileSize(file.size)
     if (!sizeCheck.valid) {
       throw new Error(sizeCheck.error)

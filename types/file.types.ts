@@ -6,7 +6,7 @@ export interface FileRecord {
   type: FileType
   mimeType: string
   size: number // bytes
-  folderId: string
+  folderId: string | null
   ownerId: string
   blob: Blob // binary data stored in IndexedDB
   createdAt: Date

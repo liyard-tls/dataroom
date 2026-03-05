@@ -116,10 +116,16 @@ export class IndexedDBAdapter implements StorageAdapter {
   // Files
   // ---------------------------------------------------------------------------
 
-  async getFilesByFolder(folderId: string): Promise<FileMetadata[]> {
+  async getFilesByFolder(folderId: string | null): Promise<FileMetadata[]> {
     const db = await getDB()
+    // IDBIndex cannot query null keys — fall back to full scan and filter
+    if (folderId === null) {
+      const all = await db.getAll('files')
+      return all
+        .filter((f) => f.folderId === null)
+        .map(({ blob: _blob, ...metadata }) => metadata)
+    }
     const files = await db.getAllFromIndex('files', 'by-folder', folderId)
-    // Strip blob from metadata to avoid loading binary data when listing
     return files.map(({ blob: _blob, ...metadata }) => metadata)
   }
 

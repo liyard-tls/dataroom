@@ -13,10 +13,6 @@ export function useFiles(folderId: string | null) {
   const { openViewer } = useUIStore()
 
   const loadFiles = useCallback(async () => {
-    if (!folderId) {
-      setFiles([])
-      return
-    }
     setLoading(true)
     try {
       const data = await fileService.getFiles(folderId)
@@ -30,7 +26,7 @@ export function useFiles(folderId: string | null) {
   }, [folderId, setFiles, setLoading, setError])
 
   const uploadFiles = useCallback(async (browserFiles: File[]) => {
-    if (!user || !folderId) return
+    if (!user) return
     const results = await Promise.allSettled(
       browserFiles.map((f) => fileService.uploadFile(f, folderId, user.uid))
     )

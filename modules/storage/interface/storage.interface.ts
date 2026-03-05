@@ -37,7 +37,7 @@ export interface StorageAdapter {
   // ---------------------------------------------------------------------------
 
   /** Returns file metadata (without blob) for all files in a folder */
-  getFilesByFolder(folderId: string): Promise<FileMetadata[]>
+  getFilesByFolder(folderId: string | null): Promise<FileMetadata[]>
 
   /** Returns the full file record including blob */
   getFileById(id: string): Promise<FileRecord | null>
