@@ -20,14 +20,16 @@ import { buildBreadcrumb } from '@/modules/folders/services/folder.service'
 import { useFileStore } from '@/store/fileStore'
 import { authService } from '@/modules/auth'
 import { Button } from '@/components/ui/button'
-import { LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { PanelLeftOpen } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
+import { useAuthStore } from '@/store/authStore'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 function DataRoomApp() {
   const router = useRouter()
   const { isSidebarCollapsed, toggleSidebar } = useUIStore()
+  const user = useAuthStore((state) => state.user)
   const {
     folders,
     currentFolderId,
@@ -92,42 +94,41 @@ function DataRoomApp() {
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="flex h-screen flex-col overflow-hidden">
-        {/* Top navigation bar */}
-        <header className="flex items-center gap-3 border-b bg-background px-4 py-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSidebar}>
-            {isSidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-          </Button>
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar — full height, contains logo + nav */}
+        <div
+          className={cn(
+            'w-[22.5rem] flex-shrink-0 overflow-hidden transition-[margin] duration-300 ease-out',
+            isSidebarCollapsed ? '-ml-[22.5rem]' : 'ml-0'
+          )}
+        >
+          <Sidebar
+            folders={folders}
+            currentFolderId={currentFolderId}
+            onNavigate={setCurrentFolderId}
+            onCreateFolder={createFolder}
+            onRenameFolder={renameFolder}
+            onDeleteFolder={deleteFolder}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={toggleSidebar}
+            user={user}
+            onUploadFiles={uploadFiles}
+            onSignOut={handleSignOut}
+          />
+        </div>
 
-          <span className="font-semibold text-primary">Data Room</span>
-
-          <div className="flex-1" />
-
-          <SearchBar />
-          <ThemeToggle />
-
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSignOut} title="Sign out">
-            <LogOut size={15} />
-          </Button>
-        </header>
-
-        {/* Main split layout */}
-        <div className="flex flex-1 overflow-hidden">
-          <div
-            className={cn(
-              'transition-all duration-200',
-              isSidebarCollapsed ? 'w-0 overflow-hidden' : 'w-56 flex-shrink-0'
+        {/* Right side: header + content */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <header className="flex items-center gap-2 border-b bg-background px-4 py-2">
+            {isSidebarCollapsed && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSidebar}>
+                <PanelLeftOpen size={15} />
+              </Button>
             )}
-          >
-            <Sidebar
-              folders={folders}
-              currentFolderId={currentFolderId}
-              onNavigate={setCurrentFolderId}
-              onCreateFolder={createFolder}
-              onRenameFolder={renameFolder}
-              onDeleteFolder={deleteFolder}
-            />
-          </div>
+            <SearchBar />
+            <div className="flex-1" />
+            <ThemeToggle />
+          </header>
 
           <main className="relative flex-1 overflow-hidden">
             <MainPanel

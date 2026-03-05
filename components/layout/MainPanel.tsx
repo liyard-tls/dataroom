@@ -10,7 +10,7 @@ import { FileIcon } from '@/components/common/FileIcon'
 import { Breadcrumb } from './Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { formatFileSize } from '@/lib/fileHelpers'
+import { formatFileSize, formatModifiedDate } from '@/lib/fileHelpers'
 import { useFileStore, SortField, SortDirection } from '@/store/fileStore'
 import { cn } from '@/lib/utils'
 import {
@@ -142,7 +142,7 @@ function FolderRow({
 
       <span className={cn('text-xs text-muted-foreground', COL_SIZE)}>—</span>
       <span className={cn('text-xs text-muted-foreground', COL_DATE)}>
-        {new Date(folder.createdAt).toLocaleDateString()}
+        {formatModifiedDate(folder.updatedAt)}
       </span>
 
       <div className={COL_ACTIONS}>
@@ -251,7 +251,7 @@ function FileRow({
       </span>
 
       <span className={cn('text-xs text-muted-foreground', COL_DATE)}>
-        {new Date(file.createdAt).toLocaleDateString()}
+        {formatModifiedDate(file.updatedAt)}
       </span>
 
       <div className={COL_ACTIONS}>
@@ -375,7 +375,7 @@ export function MainPanel({
                 Size {sortField === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleSortChange('createdAt')}>
-                Date {sortField === 'createdAt' && (sortDirection === 'asc' ? '↑' : '↓')}
+                Modified {sortField === 'createdAt' && (sortDirection === 'asc' ? '↑' : '↓')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -411,7 +411,7 @@ export function MainPanel({
           </div>
           <span className={COL_NAME}>Name</span>
           <span className={COL_SIZE}>Size</span>
-          <span className={COL_DATE}>Created</span>
+          <span className={COL_DATE}>Modified</span>
           <span className={COL_ACTIONS} />
         </div>
       )}
