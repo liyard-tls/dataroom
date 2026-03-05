@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -10,34 +10,35 @@ import {
   pointerWithin,
   useSensor,
   useSensors,
-} from '@dnd-kit/core'
-import { AuthGuard } from '@/modules/auth'
-import { useFolders } from '@/modules/folders/hooks/useFolders'
-import { useFiles } from '@/modules/files/hooks/useFiles'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { MainPanel } from '@/components/layout/MainPanel'
-import { ViewerModal } from '@/modules/viewer/components/ViewerModal'
-import { SearchBar } from '@/modules/search/components/SearchBar'
-import { ThemeToggle } from '@/components/common/ThemeToggle'
-import { buildBreadcrumb } from '@/modules/folders/services/folder.service'
-import { useFileStore } from '@/store/fileStore'
-import { authService } from '@/modules/auth'
-import { fileService } from '@/modules/files/services/file.service'
-import { Button } from '@/components/ui/button'
-import { PanelLeftOpen } from 'lucide-react'
-import { FileIcon } from '@/components/common/FileIcon'
-import { useUIStore } from '@/store/uiStore'
-import { useAuthStore } from '@/store/authStore'
-import { useRouter } from 'next/navigation'
-import { cn } from '@/lib/utils'
-import { FileMetadata } from '@/types/file.types'
+} from "@dnd-kit/core";
+import { AuthGuard } from "@/modules/auth";
+import { useFolders } from "@/modules/folders/hooks/useFolders";
+import { useFiles } from "@/modules/files/hooks/useFiles";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { MainPanel } from "@/components/layout/MainPanel";
+import { ViewerModal } from "@/modules/viewer/components/ViewerModal";
+import { SearchBar } from "@/modules/search/components/SearchBar";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { Breadcrumb } from "@/components/layout/Breadcrumb";
+import { buildBreadcrumb } from "@/modules/folders/services/folder.service";
+import { useFileStore } from "@/store/fileStore";
+import { authService } from "@/modules/auth";
+import { fileService } from "@/modules/files/services/file.service";
+import { Button } from "@/components/ui/button";
+import { PanelLeftOpen, Download, Trash2 } from "lucide-react";
+import { FileIcon } from "@/components/common/FileIcon";
+import { useUIStore } from "@/store/uiStore";
+import { useAuthStore } from "@/store/authStore";
+import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { FileMetadata } from "@/types/file.types";
 
 function DataRoomApp() {
-  const router = useRouter()
-  const { isSidebarCollapsed, toggleSidebar } = useUIStore()
-  const user = useAuthStore((state) => state.user)
-  const [allFiles, setAllFiles] = useState<FileMetadata[]>([])
-  const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const router = useRouter();
+  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
+  const user = useAuthStore((state) => state.user);
+  const [allFiles, setAllFiles] = useState<FileMetadata[]>([]);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const {
     folders,
     currentFolderId,
@@ -48,9 +49,10 @@ function DataRoomApp() {
     deleteFolder,
     moveFolder,
     setCurrentFolderId,
-  } = useFolders()
+  } = useFolders();
 
-  const { toggleSelection, selectAll, clearSelection, selectedIds } = useFileStore()
+  const { toggleSelection, selectAll, clearSelection, selectedIds } =
+    useFileStore();
   const {
     files,
     isLoading: filesLoading,
@@ -59,85 +61,99 @@ function DataRoomApp() {
     renameFile,
     deleteFile,
     deleteSelected,
+    downloadSelected,
     openFile,
     moveFile,
-  } = useFiles(currentFolderId)
+  } = useFiles(currentFolderId);
 
   // Load folder tree on mount
-  useEffect(() => { loadFolders() }, [loadFolders])
+  useEffect(() => {
+    loadFolders();
+  }, [loadFolders]);
 
   // Reload files when current folder changes
-  useEffect(() => { loadFiles() }, [loadFiles, currentFolderId])
+  useEffect(() => {
+    loadFiles();
+  }, [loadFiles, currentFolderId]);
 
   const loadAllFiles = useCallback(async () => {
     if (!user) {
-      setAllFiles([])
-      return
+      setAllFiles([]);
+      return;
     }
-    const data = await fileService.getFilesByOwner(user.uid)
-    setAllFiles(data)
-  }, [user])
+    const data = await fileService.getFilesByOwner(user.uid);
+    setAllFiles(data);
+  }, [user]);
 
   // Keep sidebar/main panel folder metadata in sync with file changes across the tree
   useEffect(() => {
     queueMicrotask(() => {
-      void loadAllFiles()
-    })
-  }, [loadAllFiles, files, folders])
+      void loadAllFiles();
+    });
+  }, [loadAllFiles, files, folders]);
 
-  const breadcrumbPath = buildBreadcrumb(folders, currentFolderId)
+  const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
 
   // DnD sensors — require 8px movement to start drag to avoid accidental drags on clicks
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
 
   function handleDragStart(event: DragStartEvent) {
-    setActiveDragId(event.active.id as string)
+    setActiveDragId(event.active.id as string);
   }
 
   function handleDragCancel() {
-    setActiveDragId(null)
+    setActiveDragId(null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    setActiveDragId(null)
+    setActiveDragId(null);
 
-    const { active, over } = event
-    if (!over) return
+    const { active, over } = event;
+    if (!over) return;
 
-    const activeId = active.id as string
-    const overId = over.id as string // format: "folder-<id>" or "folder-root"
+    const activeId = active.id as string;
+    const overId = over.id as string; // format: "folder-<id>" or "folder-root"
 
     // Extract target folder ID from droppable ID
-    const targetFolderId = overId === 'folder-root' ? null : overId.replace('folder-', '')
+    const targetFolderId =
+      overId === "folder-root" ? null : overId.replace("folder-", "");
 
     // Determine if the dragged item is a file or folder
-    const file = allFiles.find((f) => f.id === activeId)
-    const isFile = !!file
-    const isFolder = folders.some((f) => f.id === activeId)
+    const file = allFiles.find((f) => f.id === activeId);
+    const isFile = !!file;
+    const isFolder = folders.some((f) => f.id === activeId);
 
     if (isFile && file.folderId !== targetFolderId) {
       setAllFiles((prev) =>
         prev.map((candidate) =>
-          candidate.id === activeId ? { ...candidate, folderId: targetFolderId } : candidate
-        )
-      )
-      moveFile(activeId, targetFolderId ?? '')
+          candidate.id === activeId
+            ? { ...candidate, folderId: targetFolderId }
+            : candidate,
+        ),
+      );
+      moveFile(activeId, targetFolderId ?? "");
     } else if (isFolder && targetFolderId !== activeId) {
-      moveFolder(activeId, targetFolderId)
+      moveFolder(activeId, targetFolderId);
     }
   }
 
   async function handleSignOut() {
-    await authService.signOut()
-    router.replace('/login')
+    await authService.signOut();
+    router.replace("/login");
   }
 
-  const draggedFolder = activeDragId ? folders.find((f) => f.id === activeDragId) : undefined
-  const draggedFile = activeDragId ? allFiles.find((f) => f.id === activeDragId) : undefined
-  const draggedFolderHasContent = !!draggedFolder && (
-    folders.some((f) => f.parentId === draggedFolder.id) ||
-    allFiles.some((f) => f.folderId === draggedFolder.id)
-  )
+  const draggedFolder = activeDragId
+    ? folders.find((f) => f.id === activeDragId)
+    : undefined;
+  const draggedFile = activeDragId
+    ? allFiles.find((f) => f.id === activeDragId)
+    : undefined;
+  const draggedFolderHasContent =
+    !!draggedFolder &&
+    (folders.some((f) => f.parentId === draggedFolder.id) ||
+      allFiles.some((f) => f.folderId === draggedFolder.id));
 
   return (
     <DndContext
@@ -151,8 +167,8 @@ function DataRoomApp() {
         {/* Sidebar — full height, contains logo + nav */}
         <div
           className={cn(
-            'w-[22.5rem] flex-shrink-0 overflow-hidden transition-[margin] duration-300 ease-out',
-            isSidebarCollapsed ? '-ml-[22.5rem]' : 'ml-0'
+            "w-[22.5rem] flex-shrink-0 overflow-hidden transition-[margin] duration-300 ease-out",
+            isSidebarCollapsed ? "-ml-[22.5rem]" : "ml-0",
           )}
         >
           <Sidebar
@@ -174,14 +190,50 @@ function DataRoomApp() {
 
         {/* Right side: header + content */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          <header className="flex items-center gap-2 border-b bg-background px-4 py-2">
+          <header className="flex items-center gap-3 border-b bg-background px-6 py-2.5">
             {isSidebarCollapsed && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSidebar}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={toggleSidebar}
+              >
                 <PanelLeftOpen size={15} />
               </Button>
             )}
-            <SearchBar />
+            <Breadcrumb
+              path={breadcrumbPath}
+              onNavigate={setCurrentFolderId}
+              className="ml-7"
+            />
             <div className="flex-1" />
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedIds.size} item{selectedIds.size !== 1 ? "s" : ""}{" "}
+                  selected
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  onClick={() => downloadSelected(folders)}
+                >
+                  <Download size={13} />
+                  Download
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={deleteSelected}
+                >
+                  <Trash2 size={13} />
+                  Delete
+                </Button>
+              </div>
+            )}
+            <SearchBar />
             <ThemeToggle />
           </header>
 
@@ -215,7 +267,10 @@ function DataRoomApp() {
       <DragOverlay dropAnimation={null} zIndex={1200}>
         {draggedFolder && (
           <div className="pointer-events-none flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
-            <FileIcon type={draggedFolderHasContent ? 'folder-filled' : 'folder'} size={18} />
+            <FileIcon
+              type={draggedFolderHasContent ? "folder-filled" : "folder"}
+              size={18}
+            />
             <span className="max-w-[22rem] truncate">{draggedFolder.name}</span>
           </div>
         )}
@@ -229,7 +284,7 @@ function DataRoomApp() {
 
       <ViewerModal />
     </DndContext>
-  )
+  );
 }
 
 export default function DataRoomPage() {
@@ -237,5 +292,5 @@ export default function DataRoomPage() {
     <AuthGuard>
       <DataRoomApp />
     </AuthGuard>
-  )
+  );
 }

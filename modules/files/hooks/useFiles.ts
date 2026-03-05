@@ -91,6 +91,20 @@ export function useFiles(folderId: string | null) {
     }
   }, [removeFile])
 
+  const downloadSelected = useCallback(async (allFolders: import('@/types/folder.types').Folder[]) => {
+    const ids = Array.from(selectedIds)
+    if (!ids.length) return
+    const allFileMetadata = await fileService.getFilesByOwner(user?.uid ?? '')
+    const fileIds = ids.filter((id) => allFileMetadata.some((f) => f.id === id))
+    const folderIds = ids.filter((id) => !fileIds.includes(id))
+    try {
+      await fileService.downloadAsZip(fileIds, folderIds, allFolders)
+      toast.success('Download started')
+    } catch {
+      toast.error('Failed to create zip')
+    }
+  }, [selectedIds, user])
+
   // Sort files in-memory based on current sort settings
   const sortedFiles = [...files].sort((a, b) => {
     let cmp = 0
@@ -111,6 +125,7 @@ export function useFiles(folderId: string | null) {
     renameFile,
     deleteFile,
     deleteSelected,
+    downloadSelected,
     openFile,
     moveFile,
   }
