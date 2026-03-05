@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   DndContext,
   DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -22,6 +24,7 @@ import { authService } from '@/modules/auth'
 import { fileService } from '@/modules/files/services/file.service'
 import { Button } from '@/components/ui/button'
 import { PanelLeftOpen } from 'lucide-react'
+import { FileIcon } from '@/components/common/FileIcon'
 import { useUIStore } from '@/store/uiStore'
 import { useAuthStore } from '@/store/authStore'
 import { useRouter } from 'next/navigation'
@@ -33,6 +36,7 @@ function DataRoomApp() {
   const { isSidebarCollapsed, toggleSidebar } = useUIStore()
   const user = useAuthStore((state) => state.user)
   const [allFiles, setAllFiles] = useState<FileMetadata[]>([])
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const {
     folders,
     currentFolderId,
@@ -85,7 +89,17 @@ function DataRoomApp() {
   // DnD sensors — require 8px movement to start drag to avoid accidental drags on clicks
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
+  function handleDragStart(event: DragStartEvent) {
+    setActiveDragId(event.active.id as string)
+  }
+
+  function handleDragCancel() {
+    setActiveDragId(null)
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setActiveDragId(null)
+
     const { active, over } = event
     if (!over) return
 
@@ -96,12 +110,18 @@ function DataRoomApp() {
     const targetFolderId = overId === 'folder-root' ? null : overId.replace('folder-', '')
 
     // Determine if the dragged item is a file or folder
-    const isFile = files.some((f) => f.id === activeId)
+    const file = allFiles.find((f) => f.id === activeId)
+    const isFile = !!file
     const isFolder = folders.some((f) => f.id === activeId)
 
-    if (isFile && targetFolderId !== currentFolderId) {
+    if (isFile && file.folderId !== targetFolderId) {
+      setAllFiles((prev) =>
+        prev.map((candidate) =>
+          candidate.id === activeId ? { ...candidate, folderId: targetFolderId } : candidate
+        )
+      )
       moveFile(activeId, targetFolderId ?? '')
-    } else if (isFolder) {
+    } else if (isFolder && targetFolderId !== activeId) {
       moveFolder(activeId, targetFolderId)
     }
   }
@@ -111,8 +131,20 @@ function DataRoomApp() {
     router.replace('/login')
   }
 
+  const draggedFolder = activeDragId ? folders.find((f) => f.id === activeDragId) : undefined
+  const draggedFile = activeDragId ? allFiles.find((f) => f.id === activeDragId) : undefined
+  const draggedFolderHasContent = !!draggedFolder && (
+    folders.some((f) => f.parentId === draggedFolder.id) ||
+    allFiles.some((f) => f.folderId === draggedFolder.id)
+  )
+
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragCancel={handleDragCancel}
+      onDragEnd={handleDragEnd}
+    >
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar — full height, contains logo + nav */}
         <div
@@ -177,6 +209,21 @@ function DataRoomApp() {
           </main>
         </div>
       </div>
+
+      <DragOverlay dropAnimation={null} zIndex={1200}>
+        {draggedFolder && (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
+            <FileIcon type={draggedFolderHasContent ? 'folder-filled' : 'folder'} size={18} />
+            <span className="max-w-[22rem] truncate">{draggedFolder.name}</span>
+          </div>
+        )}
+        {draggedFile && (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
+            <FileIcon type={draggedFile.type} size={18} />
+            <span className="max-w-[22rem] truncate">{draggedFile.name}</span>
+          </div>
+        )}
+      </DragOverlay>
 
       <ViewerModal />
     </DndContext>

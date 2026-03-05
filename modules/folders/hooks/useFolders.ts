@@ -55,15 +55,23 @@ export function useFolders() {
   }, [removeFolder])
 
   const moveFolder = useCallback(async (id: string, newParentId: string | null) => {
+    const folder = folders.find((f) => f.id === id)
+    if (!folder) return
+
+    // Optimistic update so folder moves instantly in the UI
+    const optimisticFolder = { ...folder, parentId: newParentId, updatedAt: new Date() }
+    updateFolder(optimisticFolder)
+
     try {
       await folderService.moveFolder(id, newParentId)
-      // Reload the tree after move to reflect all changes
-      await loadFolders()
     } catch (err) {
+      // Roll back optimistic state on failure
+      updateFolder(folder)
       const message = err instanceof Error ? err.message : 'Failed to move folder'
       toast.error(message)
+      await loadFolders()
     }
-  }, [loadFolders])
+  }, [folders, updateFolder, loadFolders])
 
   return {
     folders,

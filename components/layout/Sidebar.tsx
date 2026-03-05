@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -13,8 +13,9 @@ import {
   LogOut,
   Upload,
 } from "lucide-react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { motion, AnimatePresence } from "framer-motion";
+import { CSS } from "@dnd-kit/utilities";
 import { Folder } from "@/types/folder.types";
 import { AuthUser } from "@/types/auth.types";
 import { FileMetadata } from "@/types/file.types";
@@ -41,8 +42,8 @@ interface SidebarProps {
 
 interface FolderNodeProps {
   folder: Folder;
-  allFolders: Folder[];
-  allFiles: FileMetadata[];
+  childFoldersByParentId: Map<string | null, Folder[]>;
+  filesByFolderId: Map<string, FileMetadata[]>;
   currentFolderId: string | null;
   depth: number;
   onNavigate: (id: string | null) => void;
@@ -52,10 +53,50 @@ interface FolderNodeProps {
   onOpenFile: (id: string) => void;
 }
 
+function SidebarFileNode({
+  file,
+  depth,
+  onOpenFile,
+}: {
+  file: FileMetadata;
+  depth: number;
+  onOpenFile: (id: string) => void;
+}) {
+  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({
+    id: file.id,
+  });
+
+  return (
+    <motion.button
+      ref={setNodeRef}
+      layout
+      className={cn(
+        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-base transition-[color,background-color] duration-150 hover:bg-accent",
+        "text-foreground",
+        isDragging && "relative z-[60]",
+      )}
+      style={{
+        paddingLeft: `${(depth + 1) * 12 + 32}px`,
+        transform: isDragging ? undefined : CSS.Translate.toString(transform),
+      }}
+      onClick={() => onOpenFile(file.id)}
+      {...attributes}
+      {...listeners}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+    >
+      <FileIcon type={file.type} size={18} />
+      <span className="truncate">{file.name}</span>
+    </motion.button>
+  );
+}
+
 function FolderNode({
   folder,
-  allFolders,
-  allFiles,
+  childFoldersByParentId,
+  filesByFolderId,
   currentFolderId,
   depth,
   onNavigate,
@@ -69,13 +110,48 @@ function FolderNode({
   const [isCreating, setIsCreating] = useState(false);
   const [inputValue, setInputValue] = useState("");
 
-  const children = allFolders.filter((f) => f.parentId === folder.id);
-  const filesInFolder = allFiles.filter((f) => f.folderId === folder.id);
+  const children = childFoldersByParentId.get(folder.id) ?? [];
+  const filesInFolder = filesByFolderId.get(folder.id) ?? [];
   const hasContent = children.length > 0 || filesInFolder.length > 0;
   const isActive = currentFolderId === folder.id;
+  const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Makes this folder a drop target for DnD file/folder moves
-  const { setNodeRef, isOver } = useDroppable({ id: `folder-${folder.id}` });
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `folder-${folder.id}`,
+  });
+  const { attributes, listeners, setNodeRef: setDraggableRef, isDragging, transform } =
+    useDraggable({
+    id: folder.id,
+  });
+
+  const setNodeRef = useCallback(
+    (node: HTMLElement | null) => {
+      setDroppableRef(node);
+      setDraggableRef(node);
+    },
+    [setDroppableRef, setDraggableRef],
+  );
+
+  useEffect(() => {
+    if (isOver && !isExpanded) {
+      expandTimerRef.current = setTimeout(() => {
+        setIsExpanded(true);
+      }, 220);
+    }
+
+    if (!isOver && expandTimerRef.current) {
+      clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+
+    return () => {
+      if (expandTimerRef.current) {
+        clearTimeout(expandTimerRef.current);
+        expandTimerRef.current = null;
+      }
+    };
+  }, [isOver, isExpanded]);
 
   function handleRenameSubmit() {
     if (inputValue.trim()) {
@@ -103,13 +179,20 @@ function FolderNode({
   }
 
   return (
-    <div ref={setNodeRef}>
+    <div
+      ref={setNodeRef}
+      style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
+      className={cn(isDragging && "relative z-[60]")}
+      {...attributes}
+      {...listeners}
+    >
       <div
         className={cn(
           "group flex items-center gap-1 rounded-md px-3 py-2 text-base transition-colors",
           isActive && "bg-primary/10 text-primary font-medium",
           !isActive && "hover:bg-accent cursor-pointer",
-          isOver && "bg-primary/20 ring-1 ring-primary",
+          isOver && "bg-primary/20",
+          isDragging && "cursor-grabbing",
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
@@ -118,7 +201,7 @@ function FolderNode({
           onClick={() => setIsExpanded((v) => !v)}
           className="flex-shrink-0 p-0.5 text-muted-foreground hover:text-foreground"
         >
-          {hasContent && isExpanded ? (
+          {isExpanded ? (
             <ChevronDown size={14} />
           ) : (
             <ChevronRight size={14} />
@@ -221,21 +304,23 @@ function FolderNode({
                 </button>
               </div>
             )}
-            {children.map((child) => (
-              <FolderNode
-                key={child.id}
-                folder={child}
-                allFolders={allFolders}
-                allFiles={allFiles}
-                currentFolderId={currentFolderId}
-                depth={depth + 1}
-                onNavigate={onNavigate}
-                onCreateFolder={onCreateFolder}
-                onRenameFolder={onRenameFolder}
-                onDeleteFolder={onDeleteFolder}
-                onOpenFile={onOpenFile}
-              />
-            ))}
+            <AnimatePresence initial={false}>
+              {children.map((child) => (
+                <FolderNode
+                  key={child.id}
+                  folder={child}
+                  childFoldersByParentId={childFoldersByParentId}
+                  filesByFolderId={filesByFolderId}
+                  currentFolderId={currentFolderId}
+                  depth={depth + 1}
+                  onNavigate={onNavigate}
+                  onCreateFolder={onCreateFolder}
+                  onRenameFolder={onRenameFolder}
+                  onDeleteFolder={onDeleteFolder}
+                  onOpenFile={onOpenFile}
+                />
+              ))}
+            </AnimatePresence>
             {!isCreating && children.length === 0 && filesInFolder.length === 0 && (
               <div
                 className="px-3 py-1.5 text-sm italic text-muted-foreground"
@@ -244,20 +329,16 @@ function FolderNode({
                 Folder is empty
               </div>
             )}
-            {filesInFolder.map((file) => (
-              <button
-                key={file.id}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-base transition-colors hover:bg-accent",
-                  "text-foreground",
-                )}
-                style={{ paddingLeft: `${(depth + 1) * 12 + 32}px` }}
-                onClick={() => onOpenFile(file.id)}
-              >
-                <FileIcon type={file.type} size={18} />
-                <span className="truncate">{file.name}</span>
-              </button>
-            ))}
+            <AnimatePresence initial={false}>
+              {filesInFolder.map((file) => (
+                <SidebarFileNode
+                  key={file.id}
+                  file={file}
+                  depth={depth}
+                  onOpenFile={onOpenFile}
+                />
+              ))}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
@@ -289,7 +370,28 @@ export function Sidebar({
     id: "folder-root",
   });
 
-  const rootFolders = folders.filter((f) => f.parentId === null);
+  const childFoldersByParentId = useMemo(() => {
+    const map = new Map<string | null, Folder[]>();
+    for (const folder of folders) {
+      const siblingList = map.get(folder.parentId) ?? [];
+      siblingList.push(folder);
+      map.set(folder.parentId, siblingList);
+    }
+    return map;
+  }, [folders]);
+
+  const filesByFolderId = useMemo(() => {
+    const map = new Map<string, FileMetadata[]>();
+    for (const file of files) {
+      if (!file.folderId) continue;
+      const bucket = map.get(file.folderId) ?? [];
+      bucket.push(file);
+      map.set(file.folderId, bucket);
+    }
+    return map;
+  }, [files]);
+
+  const rootFolders = childFoldersByParentId.get(null) ?? [];
   const normalizedOwnerName =
     user?.displayName?.trim() || user?.email?.split("@")[0]?.trim();
   const roomLabel = `${normalizedOwnerName || "My"}'s room`;
@@ -390,7 +492,7 @@ export function Sidebar({
             className={cn(
               "mb-5 block w-full rounded-md px-1 py-1 text-left text-sm font-medium tracking-wide text-muted-foreground transition-colors",
               "hover:text-foreground",
-              isRootOver && "bg-accent/60 ring-1 ring-border",
+              isRootOver && "bg-accent/60",
             )}
             onClick={() => onNavigate(null)}
           >
@@ -423,8 +525,8 @@ export function Sidebar({
             <FolderNode
               key={folder.id}
               folder={folder}
-              allFolders={folders}
-              allFiles={files}
+              childFoldersByParentId={childFoldersByParentId}
+              filesByFolderId={filesByFolderId}
               currentFolderId={currentFolderId}
               depth={0}
               onNavigate={onNavigate}

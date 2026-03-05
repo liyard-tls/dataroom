@@ -101,6 +101,10 @@ export class IndexedDBAdapter implements StorageAdapter {
     const folder = await db.get('folders', id)
     if (!folder) throw new Error(`Folder not found: ${id}`)
 
+    if (newParentId === id) {
+      throw new Error('Cannot move a folder into itself')
+    }
+
     // Prevent moving a folder into its own descendant
     if (newParentId !== null) {
       const descendants = await this._collectDescendantFolderIds(db, id)
