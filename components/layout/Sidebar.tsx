@@ -39,6 +39,8 @@ interface SidebarProps {
   onOpenFile: (id: string) => void;
   onSignOut: () => void;
   isDragging?: boolean;
+  favoriteIds: Set<string>;
+  activeFileId?: string | null;
 }
 
 interface FolderNodeProps {
@@ -46,6 +48,7 @@ interface FolderNodeProps {
   childFoldersByParentId: Map<string | null, Folder[]>;
   filesByFolderId: Map<string, FileMetadata[]>;
   currentFolderId: string | null;
+  activeFileId: string | null;
   depth: number;
   onNavigate: (id: string | null) => void;
   onCreateFolder: (name: string, parentId: string | null) => void;
@@ -58,11 +61,13 @@ function SidebarFileNode({
   file,
   depth,
   isRootFile = false,
+  isActive = false,
   onOpenFile,
 }: {
   file: FileMetadata;
   depth: number;
   isRootFile?: boolean;
+  isActive?: boolean;
   onOpenFile: (id: string) => void;
 }) {
   const { setNodeRef: setDraggableRef, attributes, listeners, transform, isDragging } = useDraggable({
@@ -91,6 +96,7 @@ function SidebarFileNode({
         "text-foreground",
         isDragging && "relative z-[60]",
         isOver && "bg-primary/20",
+        isActive && "bg-primary/10 text-primary font-medium",
       )}
       style={{
         paddingLeft: `${depth * 12 + 28}px`,
@@ -110,11 +116,24 @@ function SidebarFileNode({
   );
 }
 
+// Returns true if targetId is folder.id or a descendant of folder.id
+function isFolderOrDescendant(
+  folderId: string,
+  targetId: string | null,
+  childFoldersByParentId: Map<string | null, Folder[]>,
+): boolean {
+  if (!targetId) return false;
+  if (folderId === targetId) return true;
+  const children = childFoldersByParentId.get(folderId) ?? [];
+  return children.some((c) => isFolderOrDescendant(c.id, targetId, childFoldersByParentId));
+}
+
 function FolderNode({
   folder,
   childFoldersByParentId,
   filesByFolderId,
   currentFolderId,
+  activeFileId,
   depth,
   onNavigate,
   onCreateFolder,
@@ -131,6 +150,13 @@ function FolderNode({
   const filesInFolder = filesByFolderId.get(folder.id) ?? [];
   const hasContent = children.length > 0 || filesInFolder.length > 0;
   const isActive = currentFolderId === folder.id;
+
+  // Auto-expand when current folder or active file is inside this folder
+  const containsCurrentFolder = isFolderOrDescendant(folder.id, currentFolderId, childFoldersByParentId);
+  const containsActiveFile = activeFileId ? filesInFolder.some((f) => f.id === activeFileId) : false;
+  useEffect(() => {
+    if (containsCurrentFolder || containsActiveFile) setIsExpanded(true);
+  }, [containsCurrentFolder, containsActiveFile]);
   const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Makes this folder a drop target for DnD file/folder moves
@@ -329,6 +355,7 @@ function FolderNode({
                   childFoldersByParentId={childFoldersByParentId}
                   filesByFolderId={filesByFolderId}
                   currentFolderId={currentFolderId}
+                  activeFileId={activeFileId}
                   depth={depth + 1}
                   onNavigate={onNavigate}
                   onCreateFolder={onCreateFolder}
@@ -352,6 +379,7 @@ function FolderNode({
                   key={file.id}
                   file={file}
                   depth={depth + 1}
+                  isActive={file.id === activeFileId}
                   onOpenFile={onOpenFile}
                 />
               ))}
@@ -377,6 +405,8 @@ export function Sidebar({
   onOpenFile,
   onSignOut,
   isDragging = false,
+  favoriteIds,
+  activeFileId = null,
 }: SidebarProps) {
   const [isCreatingRoot, setIsCreatingRoot] = useState(false);
   const [rootName, setRootName] = useState("");
@@ -420,6 +450,15 @@ export function Sidebar({
   );
 
   const rootFolders = childFoldersByParentId.get(null) ?? [];
+
+  const favoriteFiles = useMemo(
+    () => files.filter((f) => favoriteIds.has(f.id)),
+    [files, favoriteIds],
+  );
+  const favoriteFolders = useMemo(
+    () => folders.filter((f) => favoriteIds.has(f.id)),
+    [folders, favoriteIds],
+  );
   const normalizedOwnerName =
     user?.displayName?.trim() || user?.email?.split("@")[0]?.trim();
   const roomLabel = `${normalizedOwnerName || "My"}'s room`;
@@ -502,14 +541,43 @@ export function Sidebar({
           <span className="text-sm font-medium tracking-wide text-muted-foreground">
             Favorites
           </span>
-          <div className="mt-5">
-            <Button
-              variant="outline"
-              disabled
-              className="h-10 w-full justify-start rounded-lg px-3 text-muted-foreground"
-            >
-              No favorites yet
-            </Button>
+          <div className="mt-2">
+            {favoriteFiles.length === 0 && favoriteFolders.length === 0 ? (
+              <p className="px-1 py-2 text-xs text-muted-foreground/60">No favorites yet</p>
+            ) : (
+              <AnimatePresence initial={false}>
+                {favoriteFolders.map((folder) => (
+                  <motion.button
+                    key={folder.id}
+                    layout
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-base transition-colors hover:bg-accent"
+                    onClick={() => onNavigate(folder.id)}
+                  >
+                    <FileIcon type="folder-filled" size={18} />
+                    <span className="truncate">{folder.name}</span>
+                  </motion.button>
+                ))}
+                {favoriteFiles.map((file) => (
+                  <motion.button
+                    key={file.id}
+                    layout
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-base transition-colors hover:bg-accent"
+                    onClick={() => onOpenFile(file.id)}
+                  >
+                    <FileIcon type={file.type} size={18} />
+                    <span className="truncate">{file.name}</span>
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            )}
           </div>
         </div>
 
@@ -556,6 +624,7 @@ export function Sidebar({
               childFoldersByParentId={childFoldersByParentId}
               filesByFolderId={filesByFolderId}
               currentFolderId={currentFolderId}
+              activeFileId={activeFileId}
               depth={0}
               onNavigate={onNavigate}
               onCreateFolder={onCreateFolder}
@@ -571,6 +640,7 @@ export function Sidebar({
                 file={file}
                 depth={0}
                 isRootFile
+                isActive={file.id === activeFileId}
                 onOpenFile={onOpenFile}
               />
             ))}

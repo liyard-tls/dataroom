@@ -10,6 +10,7 @@ import {
   FolderOpen,
   Pencil,
   Eye,
+  Star,
 } from "lucide-react";
 import { FileMetadata } from "@/types/file.types";
 import { Folder } from "@/types/folder.types";
@@ -47,6 +48,8 @@ interface MainPanelProps {
   onToggleSelect: (id: string) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
+  favoriteIds: Set<string>;
+  onToggleFavorite: (id: string) => void;
 }
 
 // Shared column widths — identical in header and every row
@@ -87,18 +90,22 @@ function FolderRow({
   folder,
   isNotEmpty,
   isSelected,
+  isFavorite,
   onSelect,
   onOpen,
   onRename,
   onDelete,
+  onToggleFavorite,
 }: {
   folder: Folder;
   isNotEmpty: boolean;
   isSelected: boolean;
+  isFavorite: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onToggleFavorite: () => void;
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(folder.name);
@@ -160,6 +167,18 @@ function FolderRow({
         ) : (
           <span className="truncate text-sm">{folder.name}</span>
         )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+          onDoubleClick={stopRowPropagation}
+          className={cn(
+            "ml-1 shrink-0 rounded p-0.5 transition-colors",
+            isFavorite
+              ? "text-yellow-400"
+              : "text-transparent group-hover:text-muted-foreground/40 hover:!text-yellow-400",
+          )}
+        >
+          <Star size={13} className={cn(isFavorite && "fill-yellow-400")} />
+        </button>
       </div>
 
       <span className={cn("text-xs text-muted-foreground", COL_SIZE)}>—</span>
@@ -193,6 +212,10 @@ function FolderRow({
             >
               <Pencil size={14} className="mr-2" /> Rename
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={onToggleFavorite}>
+              <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
+              {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={onDelete}
@@ -210,17 +233,21 @@ function FolderRow({
 function FileRow({
   file,
   isSelected,
+  isFavorite,
   onSelect,
   onOpen,
   onRename,
   onDelete,
+  onToggleFavorite,
 }: {
   file: FileMetadata;
   isSelected: boolean;
+  isFavorite: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onToggleFavorite: () => void;
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(file.name);
@@ -277,6 +304,18 @@ function FileRow({
         ) : (
           <span className="truncate text-sm">{file.name}</span>
         )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+          onDoubleClick={stopRowPropagation}
+          className={cn(
+            "ml-1 shrink-0 rounded p-0.5 transition-colors",
+            isFavorite
+              ? "text-yellow-400"
+              : "text-transparent group-hover:text-muted-foreground/40 hover:!text-yellow-400",
+          )}
+        >
+          <Star size={13} className={cn(isFavorite && "fill-yellow-400")} />
+        </button>
       </div>
 
       <span className={cn("text-xs text-muted-foreground", COL_SIZE)}>
@@ -313,6 +352,10 @@ function FileRow({
             >
               <Pencil size={14} className="mr-2" /> Rename
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={onToggleFavorite}>
+              <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
+              {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={onDelete}
@@ -348,6 +391,8 @@ export function MainPanel({
   onToggleSelect,
   onSelectAll: _onSelectAll,
   onClearSelection,
+  favoriteIds,
+  onToggleFavorite,
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -451,10 +496,12 @@ export function MainPanel({
                     ) || allFiles.some((file) => file.folderId === folder.id)
                   }
                   isSelected={selectedIds.has(folder.id)}
+                  isFavorite={favoriteIds.has(folder.id)}
                   onSelect={() => onToggleSelect(folder.id)}
                   onOpen={() => onFolderOpen(folder.id)}
                   onRename={(name) => onFolderRename(folder.id, name)}
                   onDelete={() => onFolderDelete(folder.id)}
+                  onToggleFavorite={() => onToggleFavorite(folder.id)}
                 />
               ))}
             </AnimatePresence>
@@ -465,10 +512,12 @@ export function MainPanel({
                   key={file.id}
                   file={file}
                   isSelected={selectedIds.has(file.id)}
+                  isFavorite={favoriteIds.has(file.id)}
                   onSelect={() => onToggleSelect(file.id)}
                   onOpen={() => onOpenFile(file.id)}
                   onRename={(name) => onRenameFile(file.id, name)}
                   onDelete={() => onDeleteFile(file.id)}
+                  onToggleFavorite={() => onToggleFavorite(file.id)}
                 />
               ))}
             </AnimatePresence>

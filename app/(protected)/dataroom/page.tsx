@@ -37,7 +37,7 @@ import { FileMetadata } from "@/types/file.types";
 
 function DataRoomApp() {
   const router = useRouter();
-  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
+  const { isSidebarCollapsed, toggleSidebar, favoriteIds, toggleFavorite, viewerFile } = useUIStore();
   const user = useAuthStore((state) => state.user);
   const [allFiles, setAllFiles] = useState<FileMetadata[]>([]);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -223,6 +223,8 @@ function DataRoomApp() {
             onOpenFile={openFile}
             onSignOut={handleSignOut}
             isDragging={activeDragId !== null}
+            favoriteIds={favoriteIds}
+            activeFileId={viewerFile?.id ?? null}
           />
         </div>
 
@@ -297,6 +299,8 @@ function DataRoomApp() {
               onToggleSelect={toggleSelection}
               onSelectAll={selectAll}
               onClearSelection={clearSelection}
+              favoriteIds={favoriteIds}
+              onToggleFavorite={toggleFavorite}
             />
           </main>
         </div>
