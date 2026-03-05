@@ -124,7 +124,9 @@ export const fileService = {
     }
 
     const zipped = zipSync(zipEntries)
-    const blob = new Blob([zipped], { type: 'application/zip' })
+    const zipBytes = new Uint8Array(zipped.byteLength)
+    zipBytes.set(zipped)
+    const blob = new Blob([zipBytes.buffer], { type: 'application/zip' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
