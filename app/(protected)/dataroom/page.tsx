@@ -7,6 +7,7 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  pointerWithin,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -141,6 +142,7 @@ function DataRoomApp() {
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
@@ -212,13 +214,13 @@ function DataRoomApp() {
 
       <DragOverlay dropAnimation={null} zIndex={1200}>
         {draggedFolder && (
-          <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
+          <div className="pointer-events-none flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
             <FileIcon type={draggedFolderHasContent ? 'folder-filled' : 'folder'} size={18} />
             <span className="max-w-[22rem] truncate">{draggedFolder.name}</span>
           </div>
         )}
         {draggedFile && (
-          <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
+          <div className="pointer-events-none flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
             <FileIcon type={draggedFile.type} size={18} />
             <span className="max-w-[22rem] truncate">{draggedFile.name}</span>
           </div>
