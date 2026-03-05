@@ -32,6 +32,7 @@ export function FileIcon({ type, className, size = 20 }: FileIconProps) {
   return (
     <Icon
       size={size}
+      style={{ width: size, height: size, flexShrink: 0 }}
       className={cn(color, type === 'folder-filled' && 'fill-yellow-500/35', className)}
     />
   )

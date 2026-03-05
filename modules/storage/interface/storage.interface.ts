@@ -51,7 +51,7 @@ export interface StorageAdapter {
 
   deleteFile(id: string): Promise<void>
 
-  moveFile(id: string, newFolderId: string): Promise<void>
+  moveFile(id: string, newFolderId: string | null): Promise<void>
 
   // ---------------------------------------------------------------------------
   // Search

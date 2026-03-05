@@ -38,6 +38,7 @@ interface SidebarProps {
   onUploadFiles: (files: File[]) => void;
   onOpenFile: (id: string) => void;
   onSignOut: () => void;
+  isDragging?: boolean;
 }
 
 interface FolderNodeProps {
@@ -56,15 +57,30 @@ interface FolderNodeProps {
 function SidebarFileNode({
   file,
   depth,
+  isRootFile = false,
   onOpenFile,
 }: {
   file: FileMetadata;
   depth: number;
+  isRootFile?: boolean;
   onOpenFile: (id: string) => void;
 }) {
-  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({
+  const { setNodeRef: setDraggableRef, attributes, listeners, transform, isDragging } = useDraggable({
     id: file.id,
   });
+  // Root files act as a drop target for "move to root"
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `file-root-${file.id}`,
+    disabled: !isRootFile,
+  });
+
+  const setNodeRef = useCallback(
+    (node: HTMLElement | null) => {
+      setDraggableRef(node);
+      setDroppableRef(node);
+    },
+    [setDraggableRef, setDroppableRef],
+  );
 
   return (
     <motion.button
@@ -74,9 +90,10 @@ function SidebarFileNode({
         "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-base transition-[color,background-color] duration-150 hover:bg-accent",
         "text-foreground",
         isDragging && "relative z-[60]",
+        isOver && "bg-primary/20",
       )}
       style={{
-        paddingLeft: `${(depth + 1) * 12 + 32}px`,
+        paddingLeft: `${depth * 12 + 28}px`,
         transform: isDragging ? undefined : CSS.Translate.toString(transform),
       }}
       onClick={() => onOpenFile(file.id)}
@@ -334,7 +351,7 @@ function FolderNode({
                 <SidebarFileNode
                   key={file.id}
                   file={file}
-                  depth={depth}
+                  depth={depth + 1}
                   onOpenFile={onOpenFile}
                 />
               ))}
@@ -359,6 +376,7 @@ export function Sidebar({
   onUploadFiles,
   onOpenFile,
   onSignOut,
+  isDragging = false,
 }: SidebarProps) {
   const [isCreatingRoot, setIsCreatingRoot] = useState(false);
   const [rootName, setRootName] = useState("");
@@ -368,6 +386,11 @@ export function Sidebar({
   // Root is a drop target too
   const { setNodeRef: setRootRef, isOver: isRootOver } = useDroppable({
     id: "folder-root",
+  });
+
+  // Bottom root drop zone
+  const { setNodeRef: setRootBottomRef, isOver: isRootBottomOver } = useDroppable({
+    id: "folder-root-bottom",
   });
 
   const childFoldersByParentId = useMemo(() => {
@@ -390,6 +413,11 @@ export function Sidebar({
     }
     return map;
   }, [files]);
+
+  const rootFiles = useMemo(
+    () => files.filter((f) => !f.folderId),
+    [files],
+  );
 
   const rootFolders = childFoldersByParentId.get(null) ?? [];
   const normalizedOwnerName =
@@ -536,6 +564,30 @@ export function Sidebar({
               onOpenFile={onOpenFile}
             />
           ))}
+          <AnimatePresence initial={false}>
+            {rootFiles.map((file) => (
+              <SidebarFileNode
+                key={file.id}
+                file={file}
+                depth={0}
+                isRootFile
+                onOpenFile={onOpenFile}
+              />
+            ))}
+          </AnimatePresence>
+          {isDragging && (
+            <div
+              ref={setRootBottomRef}
+              className={cn(
+                "mt-1 flex h-10 items-center justify-center rounded-md border border-dashed transition-colors",
+                isRootBottomOver
+                  ? "border-primary/40 bg-primary/10 text-xs text-foreground"
+                  : "border-border text-xs text-muted-foreground/50",
+              )}
+            >
+              Move to root
+            </div>
+          )}
         </div>
       </div>
 

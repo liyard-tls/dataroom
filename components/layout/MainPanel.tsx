@@ -351,8 +351,9 @@ export function MainPanel({
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const { setNodeRef } = useDroppable({
-    id: `folder-${currentFolderId ?? "root"}`,
+  const { setNodeRef, isOver: isDndOver } = useDroppable({
+    id: "main-panel",
+    data: { folderId: currentFolderId },
   });
 
   const childFolders = folders.filter((f) => f.parentId === currentFolderId);
@@ -384,7 +385,7 @@ export function MainPanel({
       ref={setNodeRef}
       className={cn(
         "relative flex h-full flex-col transition-colors",
-        isDragOver && "bg-primary/5 ring-2 ring-inset ring-primary/30",
+        (isDragOver || isDndOver) && "bg-primary/5 ring-2 ring-inset ring-primary/30",
       )}
       onDragOver={handleDragOver}
       onDragLeave={() => setIsDragOver(false)}

@@ -8,8 +8,10 @@ import {
   DragStartEvent,
   PointerSensor,
   pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import { AuthGuard } from "@/modules/auth";
 import { useFolders } from "@/modules/folders/hooks/useFolders";
@@ -51,7 +53,7 @@ function DataRoomApp() {
     setCurrentFolderId,
   } = useFolders();
 
-  const { toggleSelection, selectAll, clearSelection, selectedIds } =
+  const { toggleSelection, selectAll, clearSelection, selectedIds, removeFile } =
     useFileStore();
   const {
     files,
@@ -85,12 +87,10 @@ function DataRoomApp() {
     setAllFiles(data);
   }, [user]);
 
-  // Keep sidebar/main panel folder metadata in sync with file changes across the tree
+  // Keep allFiles in sync when folder list changes (folder moves/deletes)
   useEffect(() => {
-    queueMicrotask(() => {
-      void loadAllFiles();
-    });
-  }, [loadAllFiles, files, folders]);
+    void loadAllFiles();
+  }, [loadAllFiles, folders]);
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
 
@@ -99,11 +99,24 @@ function DataRoomApp() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
+  // Try pointerWithin first (precise), fall back to rectIntersection (works even
+  // when the pointer is over the DragOverlay or an overflow-hidden container)
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const pointerHits = pointerWithin(args);
+    if (pointerHits.length > 0) return pointerHits;
+    return rectIntersection(args);
+  }, []);
+
   function handleDragStart(event: DragStartEvent) {
-    setActiveDragId(event.active.id as string);
+    const id = event.active.id as string;
+    const isFolder = folders.some((f) => f.id === id);
+    const isFile = allFiles.some((f) => f.id === id);
+    console.log("[dnd] dragStart", { id, type: isFolder ? "folder" : isFile ? "file" : "unknown" });
+    setActiveDragId(id);
   }
 
   function handleDragCancel() {
+    console.log("[dnd] dragCancel");
     setActiveDragId(null);
   }
 
@@ -111,21 +124,42 @@ function DataRoomApp() {
     setActiveDragId(null);
 
     const { active, over } = event;
-    if (!over) return;
+    console.log("[dnd] dragEnd", { activeId: active.id, overId: over?.id ?? null });
+
+    if (!over) {
+      console.log("[dnd] no drop target — cancelled");
+      return;
+    }
 
     const activeId = active.id as string;
-    const overId = over.id as string; // format: "folder-<id>" or "folder-root"
+    const overId = over.id as string;
 
-    // Extract target folder ID from droppable ID
-    const targetFolderId =
-      overId === "folder-root" ? null : overId.replace("folder-", "");
+    // Extract target folder ID from droppable ID.
+    // "main-panel" carries the current folder in its data; sidebar uses "folder-<id>" / "folder-root"
+    let targetFolderId: string | null;
+    if (overId === "main-panel") {
+      targetFolderId = (over.data.current as { folderId: string | null } | undefined)?.folderId ?? null;
+      console.log("[dnd] dropped on main-panel, targetFolderId=", targetFolderId);
+    } else if (overId === "folder-root" || overId === "folder-root-bottom" || overId.startsWith("file-root-")) {
+      targetFolderId = null;
+    } else if (overId.startsWith("folder-")) {
+      targetFolderId = overId.replace("folder-", "");
+    } else {
+      console.log("[dnd] dropped on non-droppable target, ignoring:", overId);
+      return;
+    }
 
     // Determine if the dragged item is a file or folder
     const file = allFiles.find((f) => f.id === activeId);
     const isFile = !!file;
     const isFolder = folders.some((f) => f.id === activeId);
 
+    console.log("[dnd] resolving", { isFile, isFolder, targetFolderId, currentFolderId: file?.folderId });
+
     if (isFile && file.folderId !== targetFolderId) {
+      console.log("[dnd] moving file", activeId, "→", targetFolderId);
+      // Optimistic update: remove from current folder list + update allFiles
+      removeFile(activeId);
       setAllFiles((prev) =>
         prev.map((candidate) =>
           candidate.id === activeId
@@ -133,9 +167,12 @@ function DataRoomApp() {
             : candidate,
         ),
       );
-      moveFile(activeId, targetFolderId ?? "");
+      moveFile(activeId, targetFolderId);
     } else if (isFolder && targetFolderId !== activeId) {
+      console.log("[dnd] moving folder", activeId, "→", targetFolderId);
       moveFolder(activeId, targetFolderId);
+    } else {
+      console.log("[dnd] no-op: same location or unknown item");
     }
   }
 
@@ -158,7 +195,7 @@ function DataRoomApp() {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
@@ -185,6 +222,7 @@ function DataRoomApp() {
             onUploadFiles={uploadFiles}
             onOpenFile={openFile}
             onSignOut={handleSignOut}
+            isDragging={activeDragId !== null}
           />
         </div>
 

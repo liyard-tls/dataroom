@@ -82,14 +82,13 @@ export function useFiles(folderId: string | null) {
     }
   }, [openViewer])
 
-  const moveFile = useCallback(async (id: string, newFolderId: string) => {
+  const moveFile = useCallback(async (id: string, newFolderId: string | null) => {
     try {
       await fileService.moveFile(id, newFolderId)
-      removeFile(id)
     } catch {
       toast.error('Failed to move file')
     }
-  }, [removeFile])
+  }, [])
 
   const downloadSelected = useCallback(async (allFolders: import('@/types/folder.types').Folder[]) => {
     const ids = Array.from(selectedIds)

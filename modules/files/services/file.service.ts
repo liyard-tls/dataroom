@@ -49,7 +49,7 @@ export const fileService = {
     await Promise.all(ids.map((id) => getStorageAdapter().deleteFile(id)))
   },
 
-  async moveFile(id: string, newFolderId: string): Promise<void> {
+  async moveFile(id: string, newFolderId: string | null): Promise<void> {
     return getStorageAdapter().moveFile(id, newFolderId)
   },
 

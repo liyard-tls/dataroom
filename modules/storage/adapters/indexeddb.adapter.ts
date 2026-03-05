@@ -126,7 +126,7 @@ export class IndexedDBAdapter implements StorageAdapter {
     if (folderId === null) {
       const all = await db.getAll('files')
       return all
-        .filter((f) => f.folderId === null)
+        .filter((f) => f.folderId === null || f.folderId === '')
         .map(({ blob: _blob, ...metadata }) => metadata)
     }
     const files = await db.getAllFromIndex('files', 'by-folder', folderId)
@@ -171,7 +171,7 @@ export class IndexedDBAdapter implements StorageAdapter {
     await db.delete('files', id)
   }
 
-  async moveFile(id: string, newFolderId: string): Promise<void> {
+  async moveFile(id: string, newFolderId: string | null): Promise<void> {
     const db = await getDB()
     const file = await db.get('files', id)
     if (!file) throw new Error(`File not found: ${id}`)
