@@ -5,12 +5,11 @@
  */
 
 export const themeConfig = {
-  // HSL values for the accent color (green)
-  // These map to --primary CSS variable in globals.css
+  // Accent color — maps to --primary CSS variable in globals.css
   accent: {
-    hsl: "142 71% 45%",
-    hslDark: "142 71% 45%",
-    name: "green",
+    hsl: "0 0% 32%",
+    hslDark: "0 0% 60%",
+    name: "gray",
   },
 
   // Default theme on first load

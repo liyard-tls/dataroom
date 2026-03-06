@@ -34,6 +34,16 @@ import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { FileMetadata } from "@/types/file.types";
+import { Folder } from "@/types/folder.types";
+
+// Returns true if targetId is folderId itself or a descendant — prevents dropping a folder into itself
+function isFolderDescendant(folderId: string, targetId: string | null, folders: Folder[]): boolean {
+  if (!targetId) return false;
+  if (folderId === targetId) return true;
+  const target = folders.find((f) => f.id === targetId);
+  if (!target) return false;
+  return isFolderDescendant(folderId, target.parentId, folders);
+}
 
 function DataRoomApp() {
   const router = useRouter();
@@ -176,7 +186,7 @@ function DataRoomApp() {
       await moveFile(activeId, targetFolderId);
       // If file was moved INTO the currently open folder, reload to show it
       if (targetFolderId === currentFolderId) loadFiles();
-    } else if (isFolder && targetFolderId !== activeId) {
+    } else if (isFolder && targetFolderId !== activeId && !isFolderDescendant(activeId, targetFolderId, folders)) {
       console.log("[dnd] moving folder", activeId, "→", targetFolderId);
       moveFolder(activeId, targetFolderId);
     } else {
@@ -291,6 +301,7 @@ function DataRoomApp() {
               folders={folders}
               allFiles={allFiles}
               currentFolderId={currentFolderId}
+              activeDragId={activeDragId}
               selectedIds={selectedIds}
               isLoading={filesLoading || foldersLoading}
               breadcrumbPath={breadcrumbPath}

@@ -33,6 +33,7 @@ interface MainPanelProps {
   folders: Folder[];
   allFiles: FileMetadata[];
   currentFolderId: string | null;
+  activeDragId: string | null;
   selectedIds: Set<string>;
   isLoading: boolean;
   breadcrumbPath: Folder[];
@@ -116,15 +117,15 @@ function FolderRow({
   const { setNodeRef: setDragRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `main-${folder.id}` });
   const setNodeRef = useCallback((node: HTMLElement | null) => { setDropRef(node); setDragRef(node); }, [setDropRef, setDragRef]);
 
-  // Auto-navigate into folder when hovering during DnD
+  // Auto-navigate into folder when hovering during DnD — but never for the folder being dragged itself
   useEffect(() => {
-    if (isOver) {
+    if (isOver && !isDragging) {
       expandTimerRef.current = setTimeout(() => onOpen(), 1000);
     } else {
       if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; }
     }
     return () => { if (expandTimerRef.current) clearTimeout(expandTimerRef.current); };
-  }, [isOver, onOpen]);
+  }, [isOver, isDragging, onOpen]);
 
   function handleRenameSubmit() {
     const trimmed = nameValue.trim();
@@ -137,15 +138,14 @@ function FolderRow({
       ref={setNodeRef}
       layout
       initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: isDragging ? 0.4 : 1, y: 0 }}
       exit={{ opacity: 0 }}
       style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
       className={cn(
         "group flex items-center gap-3 rounded-lg py-2 transition-colors",
         ROW_PX,
         isSelected ? "bg-primary/10" : "hover:bg-accent",
-        isOver && "bg-primary/15 ring-1 ring-inset ring-primary/30",
-        isDragging && "opacity-40",
+        isOver && !isDragging && "bg-primary/15 ring-1 ring-inset ring-primary/30",
       )}
       onDoubleClick={onOpen}
     >
@@ -292,14 +292,13 @@ function FileRow({
     <motion.div
       ref={setNodeRef}
       initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: isDragging ? 0.4 : 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
       className={cn(
         "group flex items-center gap-3 rounded-lg py-2 transition-colors",
         ROW_PX,
         isSelected ? "bg-primary/10" : "hover:bg-accent",
-        isDragging && "opacity-40",
       )}
       onDoubleClick={onOpen}
     >
@@ -418,6 +417,7 @@ export function MainPanel({
   folders,
   allFiles,
   currentFolderId,
+  activeDragId,
   selectedIds,
   isLoading,
   breadcrumbPath: _breadcrumbPath,
@@ -445,6 +445,14 @@ export function MainPanel({
   });
 
   const childFolders = folders.filter((f) => f.parentId === currentFolderId);
+
+  // Don't highlight if the dragged item already lives in this folder
+  const draggedFile = activeDragId ? allFiles.find((f) => f.id === activeDragId) : null;
+  const draggedFolder = activeDragId ? folders.find((f) => f.id === activeDragId) : null;
+  const alreadyHere =
+    (draggedFile && draggedFile.folderId === currentFolderId) ||
+    (draggedFolder && draggedFolder.parentId === currentFolderId);
+  const showDndHighlight = isDndOver && !alreadyHere;
   const isEmpty = files.length === 0 && childFolders.length === 0;
 
   const totalItems = files.length + childFolders.length;
@@ -473,7 +481,7 @@ export function MainPanel({
       ref={setNodeRef}
       className={cn(
         "relative flex h-full flex-col transition-colors",
-        (isDragOver || isDndOver) && "bg-primary/5 ring-2 ring-inset ring-primary/30",
+        (isDragOver || showDndHighlight) && "bg-primary/5 ring-2 ring-inset ring-primary/30",
       )}
       onDragOver={handleDragOver}
       onDragLeave={() => setIsDragOver(false)}

@@ -106,7 +106,7 @@ function SidebarFileNode({
       {...attributes}
       {...listeners}
       initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: isDragging ? 0.4 : 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
     >
@@ -177,13 +177,14 @@ function FolderNode({
   );
 
   useEffect(() => {
-    if (isOver && !isExpanded) {
+    // Don't auto-expand when dragging the folder itself over itself
+    if (isOver && !isExpanded && !isDragging) {
       expandTimerRef.current = setTimeout(() => {
         setIsExpanded(true);
       }, 1000);
     }
 
-    if (!isOver && expandTimerRef.current) {
+    if ((!isOver || isDragging) && expandTimerRef.current) {
       clearTimeout(expandTimerRef.current);
       expandTimerRef.current = null;
     }
@@ -194,7 +195,7 @@ function FolderNode({
         expandTimerRef.current = null;
       }
     };
-  }, [isOver, isExpanded]);
+  }, [isOver, isExpanded, isDragging]);
 
   function handleRenameSubmit() {
     if (inputValue.trim()) {
@@ -224,7 +225,10 @@ function FolderNode({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
+      style={{
+        transform: isDragging ? undefined : CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.4 : undefined,
+      }}
       className={cn(isDragging && "relative z-[60]")}
       {...attributes}
       {...listeners}
