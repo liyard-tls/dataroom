@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -28,7 +28,17 @@ import { useFileStore } from "@/store/fileStore";
 import { authService } from "@/modules/auth";
 import { fileService } from "@/modules/files/services/file.service";
 import { Button } from "@/components/ui/button";
-import { PanelLeftOpen, PanelLeftClose, Download, Trash2, LayoutGrid, List } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { PanelLeftOpen, PanelLeftClose, Download, Trash2, LayoutGrid, List, ArrowUpDown, ListFilter, ArrowUp, ArrowDown, Check } from "lucide-react";
+import { FileType } from "@/types/file.types";
 import { FileIcon } from "@/components/common/FileIcon";
 import { useUIStore } from "@/store/uiStore";
 import { useAuthStore } from "@/store/authStore";
@@ -63,6 +73,9 @@ function DataRoomApp() {
   const [allFiles, setAllFiles] = useState<FileMetadata[]>([]);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [sortField, setSortField] = useState<"name" | "size" | "updatedAt">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [filterTypes, setFilterTypes] = useState<Set<FileType | "folder">>(new Set());
   const {
     folders,
     currentFolderId,
@@ -125,6 +138,39 @@ function DataRoomApp() {
   }, [loadAllFiles, files]);
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
+
+  // Apply filter then sort to files; sort folders (folders always on top)
+  const displayedFiles = useMemo(() => {
+    // If only "folder" is selected (no file types), show no files
+    const fileTypeFilters = [...filterTypes].filter((t) => t !== "folder") as FileType[];
+    let result = fileTypeFilters.length > 0
+      ? files.filter((f) => fileTypeFilters.includes(f.type))
+      : filterTypes.has("folder") && filterTypes.size === 1
+        ? [] // only "folder" selected — hide all files
+        : files;
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "name") cmp = a.name.localeCompare(b.name);
+      else if (sortField === "size") cmp = a.size - b.size;
+      else cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return result;
+  }, [files, filterTypes, sortField, sortDir]);
+
+  const displayedFolders = useMemo(() => {
+    const children = folders.filter((f) => f.parentId === currentFolderId);
+    // If filter is active and "folder" is not selected, hide folders
+    const hideFolders = filterTypes.size > 0 && !filterTypes.has("folder");
+    if (hideFolders) return [];
+    return [...children].sort((a, b) => {
+      // Folders: size field is N/A so fall back to name for size sort
+      if (sortField === "name") return sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+      if (sortField === "size") return sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+      const cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [folders, currentFolderId, sortField, sortDir, filterTypes]);
 
   // DnD sensors — require 8px movement to start drag to avoid accidental drags on clicks
   const sensors = useSensors(
@@ -189,11 +235,14 @@ function DataRoomApp() {
     } else if (
       overId === "folder-root" ||
       overId === "folder-root-bottom" ||
-      overId.startsWith("file-root-")
+      overId.startsWith("file-root-") ||
+      overId === "breadcrumb-root"
     ) {
       targetFolderId = null;
     } else if (overId.startsWith("main-folder-")) {
       targetFolderId = overId.replace("main-folder-", "");
+    } else if (overId.startsWith("breadcrumb-folder-")) {
+      targetFolderId = overId.replace("breadcrumb-folder-", "");
     } else if (overId.startsWith("folder-")) {
       targetFolderId = overId.replace("folder-", "");
     } else {
@@ -334,6 +383,81 @@ function DataRoomApp() {
                 </Button>
               </div>
             )}
+            {/* Sort */}
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-muted-foreground">
+                  <ArrowUpDown size={13} />
+                  Sort
+                  {sortDir === "asc" ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Sort by</DropdownMenuLabel>
+                {(["name", "size", "updatedAt"] as const).map((field) => (
+                  <DropdownMenuItem
+                    key={field}
+                    onClick={() => {
+                      if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                      else { setSortField(field); setSortDir("asc"); }
+                    }}
+                    className="flex items-center justify-between"
+                  >
+                    <span>{{ name: "Name", size: "Size", updatedAt: "Date" }[field]}</span>
+                    {sortField === field && (sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Filter by type */}
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn("h-8 gap-1.5", filterTypes.size > 0 ? "border-primary text-primary" : "text-muted-foreground")}
+                >
+                  <ListFilter size={13} />
+                  Filter
+                  {filterTypes.size > 0 && (
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                      {filterTypes.size}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Show</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {(["folder", "pdf", "image", "video", "text", "md", "other"] as (FileType | "folder")[]).map((type) => (
+                  <DropdownMenuItem
+                    key={type}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setFilterTypes((prev) => {
+                        const next = new Set(prev);
+                        next.has(type) ? next.delete(type) : next.add(type);
+                        return next;
+                      });
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Checkbox checked={filterTypes.has(type)} className="pointer-events-none" />
+                    <span className="capitalize">{type === "folder" ? "Folders" : type}</span>
+                  </DropdownMenuItem>
+                ))}
+                {filterTypes.size > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setFilterTypes(new Set())} className="text-muted-foreground">
+                      Clear filters
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <div className="flex items-center rounded-lg border border-border/60 p-0.5">
               <Button
                 variant="ghost"
@@ -360,8 +484,9 @@ function DataRoomApp() {
 
           <main className="relative flex-1 overflow-hidden">
             <MainPanel
-              files={files}
+              files={displayedFiles}
               folders={folders}
+              childFolders={displayedFolders}
               allFiles={allFiles}
               currentFolderId={currentFolderId}
               activeDragId={activeDragId}

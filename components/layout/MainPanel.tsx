@@ -31,6 +31,7 @@ import {
 interface MainPanelProps {
   files: FileMetadata[];
   folders: Folder[];
+  childFolders: Folder[];
   allFiles: FileMetadata[];
   currentFolderId: string | null;
   activeDragId: string | null;
@@ -701,6 +702,7 @@ export function MainPanel({
   favoriteIds,
   onToggleFavorite,
   viewMode,
+  childFolders,
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -708,8 +710,6 @@ export function MainPanel({
     id: "main-panel",
     data: { folderId: currentFolderId },
   });
-
-  const childFolders = folders.filter((f) => f.parentId === currentFolderId);
 
   // Don't highlight if the dragged item already lives in this folder
   const draggedFile = activeDragId ? allFiles.find((f) => f.id === activeDragId) : null;
