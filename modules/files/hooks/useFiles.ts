@@ -22,6 +22,7 @@ export function useFiles(folderId: string | null) {
   )
 
   const loadFiles = useCallback(async () => {
+    if (!user) return
     setLoading(true)
     try {
       const data = await fileService.getFiles(folderId)
@@ -32,7 +33,7 @@ export function useFiles(folderId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [folderId, setFiles, setLoading, setError])
+  }, [user, folderId, setFiles, setLoading, setError])
 
   const uploadFiles = useCallback(async (browserFiles: File[]) => {
     if (!user) return
