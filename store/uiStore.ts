@@ -17,6 +17,7 @@ export interface UploadProgress {
 interface UIState {
   theme: Theme
   isSidebarCollapsed: boolean
+  viewMode: 'list' | 'grid'
   // The file currently open in the viewer modal (null = viewer closed)
   viewerFile: FileRecord | null
   // Search query string
@@ -28,6 +29,7 @@ interface UIState {
 
   setTheme: (theme: Theme) => void
   toggleSidebar: () => void
+  setViewMode: (mode: 'list' | 'grid') => void
   openViewer: (file: FileRecord) => void
   closeViewer: () => void
   setSearchQuery: (query: string) => void
@@ -44,6 +46,7 @@ export const useUIStore = create<UIState>()(
     (set) => ({
       theme: 'system',
       isSidebarCollapsed: false,
+      viewMode: 'list',
       viewerFile: null,
       searchQuery: '',
       favoriteIds: new Set(),
@@ -51,6 +54,7 @@ export const useUIStore = create<UIState>()(
 
       setTheme: (theme) => set({ theme }),
       toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+      setViewMode: (viewMode) => set({ viewMode }),
       openViewer: (viewerFile) => set({ viewerFile }),
       closeViewer: () => set({ viewerFile: null }),
       setSearchQuery: (searchQuery) => set({ searchQuery }),
@@ -90,6 +94,7 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         theme: state.theme,
         isSidebarCollapsed: state.isSidebarCollapsed,
+        viewMode: state.viewMode,
         favoriteIds: Array.from(state.favoriteIds),
       }),
       merge: (persisted, current) => ({

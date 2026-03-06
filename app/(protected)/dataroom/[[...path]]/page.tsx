@@ -76,11 +76,12 @@ function DataRoomApp() {
     favoriteIds,
     toggleFavorite,
     viewerFile,
+    viewMode,
+    setViewMode,
   } = useUIStore();
   const user = useAuthStore((state) => state.user);
   const [allFiles, setAllFiles] = useState<FileMetadata[]>([]);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [sortField, setSortField] = useState<"name" | "size" | "updatedAt">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterTypes, setFilterTypes] = useState<Set<FileType | "folder">>(new Set());
