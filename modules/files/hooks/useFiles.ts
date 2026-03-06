@@ -5,8 +5,25 @@ import { useFileStore } from '@/store/fileStore'
 import { useUIStore } from '@/store/uiStore'
 import { useAuth } from '@/modules/auth'
 import { fileService } from '../services/file.service'
+import { FileMetadata } from '@/types/file.types'
 import { toast } from 'sonner'
 import { useShallow } from 'zustand/react/shallow'
+
+// Module-level cache shared across all useFiles instances.
+// Key: folderId (string) or 'root' for null.
+// Value: last known list of files for that folder.
+// Cache is invalidated explicitly after mutations.
+const folderCache = new Map<string, FileMetadata[]>()
+
+const cacheKey = (folderId: string | null) => folderId ?? 'root'
+
+export function invalidateFolderCache(folderId: string | null) {
+  folderCache.delete(cacheKey(folderId))
+}
+
+export function invalidateAllFolderCache() {
+  folderCache.clear()
+}
 
 export function useFiles(folderId: string | null) {
   const { user } = useAuth()
@@ -28,16 +45,26 @@ export function useFiles(folderId: string | null) {
     if (!user) return
     const requestFolderId = folderId
     currentFolderRef.current = requestFolderId
-    console.log('[useFiles] loadFiles() called, folderId=', requestFolderId)
-    setLoading(true)
+
+    const cached = folderCache.get(cacheKey(requestFolderId))
+    console.log('[loadFiles] folderId=', requestFolderId, 'hasCached=', !!cached, 'cachedCount=', cached?.length)
+    if (cached) {
+      setFiles(cached)
+      // setLoading stays false — background refresh, no spinner
+    } else {
+      setFiles([])
+      setLoading(true)
+    }
+
     try {
+      const t0 = performance.now()
       const data = await fileService.getFiles(requestFolderId)
+      console.log('[loadFiles] fetch done in', Math.round(performance.now() - t0), 'ms, folderId=', requestFolderId, 'count=', data.length, 'stale=', currentFolderRef.current !== requestFolderId)
       // Guard: discard stale response if folderId changed while request was in-flight
       if (currentFolderRef.current !== requestFolderId) {
-        console.log('[useFiles] loadFiles() DISCARDED stale response for folderId=', requestFolderId, '(current=', currentFolderRef.current, ')')
         return
       }
-      console.log('[useFiles] loadFiles() done, folderId=', requestFolderId, '→ files=', data.map(f => `${f.name}(folder=${f.folderId ?? 'null'})`))
+      folderCache.set(cacheKey(requestFolderId), data)
       setFiles(data)
     } catch {
       setError('Failed to load files')

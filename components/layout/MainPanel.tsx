@@ -3,7 +3,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
   Trash2,
@@ -136,13 +135,12 @@ function FolderRow({
   }
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
-      layout
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: isDragging ? 0.4 : 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
+      style={{
+        transform: isDragging ? undefined : CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.4 : undefined,
+      }}
       className={cn(
         "group flex items-center gap-3 rounded-lg py-2 transition-colors",
         ROW_PX,
@@ -257,7 +255,7 @@ function FolderRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -291,12 +289,12 @@ function FileRow({
   }
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: isDragging ? 0.4 : 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
+      style={{
+        transform: isDragging ? undefined : CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.4 : undefined,
+      }}
       className={cn(
         "group flex items-center gap-3 rounded-lg py-2 transition-colors",
         ROW_PX,
@@ -410,7 +408,7 @@ function FileRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -459,13 +457,12 @@ function FolderCard({
   }
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
-      layout
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: isDragging ? 0.4 : 1, scale: 1 }}
-      exit={{ opacity: 0 }}
-      style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
+      style={{
+        transform: isDragging ? undefined : CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.4 : undefined,
+      }}
       className={cn(
         "group relative flex flex-col gap-2 rounded-xl border p-3 transition-colors cursor-pointer",
         isSelected ? "border-primary/40 bg-primary/10" : "border-border/60 bg-card hover:border-border hover:bg-accent/50",
@@ -550,7 +547,7 @@ function FolderCard({
         )}
         <p className="mt-0.5 text-center text-[10px] text-muted-foreground">{formatModifiedDate(folder.updatedAt)}</p>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -584,12 +581,12 @@ function FileCard({
   }
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: isDragging ? 0.4 : 1, scale: 1 }}
-      exit={{ opacity: 0 }}
-      style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
+      style={{
+        transform: isDragging ? undefined : CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.4 : undefined,
+      }}
       className={cn(
         "group relative flex flex-col gap-2 rounded-xl border p-3 transition-colors cursor-pointer",
         isSelected ? "border-primary/40 bg-primary/10" : "border-border/60 bg-card hover:border-border hover:bg-accent/50",
@@ -673,7 +670,7 @@ function FileCard({
         )}
         <p className="mt-0.5 text-center text-[10px] text-muted-foreground">{formatFileSize(file.size)}</p>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -705,6 +702,11 @@ export function MainPanel({
   childFolders,
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // DEBUG: log every render with loading state
+  const renderCount = useRef(0)
+  renderCount.current += 1
+  console.log(`[MainPanel] render #${renderCount.current} isLoading=${isLoading} files=${files.length} folders=${childFolders.length} folderId=${currentFolderId}`)
 
   const { setNodeRef, isOver: isDndOver } = useDroppable({
     id: "main-panel",
@@ -801,81 +803,72 @@ export function MainPanel({
 
         {!isLoading && !isEmpty && viewMode === "list" && (
           <>
-            <AnimatePresence>
-              {childFolders.map((folder) => (
-                <FolderRow
-                  key={folder.id}
-                  folder={folder}
-                  isNotEmpty={
-                    folders.some(
-                      (candidate) => candidate.parentId === folder.id,
-                    ) || allFiles.some((file) => file.folderId === folder.id)
-                  }
-                  isSelected={selectedIds.has(folder.id)}
-                  isFavorite={favoriteIds.has(folder.id)}
-                  onSelect={() => onToggleSelect(folder.id)}
-                  onOpen={() => onFolderOpen(folder.id)}
-                  onRename={(name) => onFolderRename(folder.id, name)}
-                  onDelete={() => onFolderDelete(folder.id)}
-                  onToggleFavorite={() => onToggleFavorite(folder.id)}
-                />
-              ))}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {files.map((file) => (
-                <FileRow
-                  key={file.id}
-                  file={file}
-                  isSelected={selectedIds.has(file.id)}
-                  isFavorite={favoriteIds.has(file.id)}
-                  onSelect={() => onToggleSelect(file.id)}
-                  onOpen={() => onOpenFile(file.id)}
-                  onRename={(name) => onRenameFile(file.id, name)}
-                  onDelete={() => onDeleteFile(file.id)}
-                  onToggleFavorite={() => onToggleFavorite(file.id)}
-                />
-              ))}
-            </AnimatePresence>
+            {childFolders.map((folder) => (
+              <FolderRow
+                key={folder.id}
+                folder={folder}
+                isNotEmpty={
+                  folders.some(
+                    (candidate) => candidate.parentId === folder.id,
+                  ) || allFiles.some((file) => file.folderId === folder.id)
+                }
+                isSelected={selectedIds.has(folder.id)}
+                isFavorite={favoriteIds.has(folder.id)}
+                onSelect={() => onToggleSelect(folder.id)}
+                onOpen={() => onFolderOpen(folder.id)}
+                onRename={(name) => onFolderRename(folder.id, name)}
+                onDelete={() => onFolderDelete(folder.id)}
+                onToggleFavorite={() => onToggleFavorite(folder.id)}
+              />
+            ))}
+            {files.map((file) => (
+              <FileRow
+                key={file.id}
+                file={file}
+                isSelected={selectedIds.has(file.id)}
+                isFavorite={favoriteIds.has(file.id)}
+                onSelect={() => onToggleSelect(file.id)}
+                onOpen={() => onOpenFile(file.id)}
+                onRename={(name) => onRenameFile(file.id, name)}
+                onDelete={() => onDeleteFile(file.id)}
+                onToggleFavorite={() => onToggleFavorite(file.id)}
+              />
+            ))}
           </>
         )}
 
         {!isLoading && !isEmpty && viewMode === "grid" && (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 px-4 py-2">
-            <AnimatePresence>
-              {childFolders.map((folder) => (
-                <FolderCard
-                  key={folder.id}
-                  folder={folder}
-                  isNotEmpty={
-                    folders.some((candidate) => candidate.parentId === folder.id) ||
-                    allFiles.some((file) => file.folderId === folder.id)
-                  }
-                  isSelected={selectedIds.has(folder.id)}
-                  isFavorite={favoriteIds.has(folder.id)}
-                  onSelect={() => onToggleSelect(folder.id)}
-                  onOpen={() => onFolderOpen(folder.id)}
-                  onRename={(name) => onFolderRename(folder.id, name)}
-                  onDelete={() => onFolderDelete(folder.id)}
-                  onToggleFavorite={() => onToggleFavorite(folder.id)}
-                />
-              ))}
-            </AnimatePresence>
-            <AnimatePresence>
-              {files.map((file) => (
-                <FileCard
-                  key={file.id}
-                  file={file}
-                  isSelected={selectedIds.has(file.id)}
-                  isFavorite={favoriteIds.has(file.id)}
-                  onSelect={() => onToggleSelect(file.id)}
-                  onOpen={() => onOpenFile(file.id)}
-                  onRename={(name) => onRenameFile(file.id, name)}
-                  onDelete={() => onDeleteFile(file.id)}
-                  onToggleFavorite={() => onToggleFavorite(file.id)}
-                />
-              ))}
-            </AnimatePresence>
+            {childFolders.map((folder) => (
+              <FolderCard
+                key={folder.id}
+                folder={folder}
+                isNotEmpty={
+                  folders.some((candidate) => candidate.parentId === folder.id) ||
+                  allFiles.some((file) => file.folderId === folder.id)
+                }
+                isSelected={selectedIds.has(folder.id)}
+                isFavorite={favoriteIds.has(folder.id)}
+                onSelect={() => onToggleSelect(folder.id)}
+                onOpen={() => onFolderOpen(folder.id)}
+                onRename={(name) => onFolderRename(folder.id, name)}
+                onDelete={() => onFolderDelete(folder.id)}
+                onToggleFavorite={() => onToggleFavorite(folder.id)}
+              />
+            ))}
+            {files.map((file) => (
+              <FileCard
+                key={file.id}
+                file={file}
+                isSelected={selectedIds.has(file.id)}
+                isFavorite={favoriteIds.has(file.id)}
+                onSelect={() => onToggleSelect(file.id)}
+                onOpen={() => onOpenFile(file.id)}
+                onRename={(name) => onRenameFile(file.id, name)}
+                onDelete={() => onDeleteFile(file.id)}
+                onToggleFavorite={() => onToggleFavorite(file.id)}
+              />
+            ))}
           </div>
         )}
       </div>

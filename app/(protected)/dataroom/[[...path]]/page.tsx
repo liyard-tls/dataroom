@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { FileMetadata } from "@/types/file.types";
 import { Folder } from "@/types/folder.types";
 import { resolveFolderPath, useFolderNavigation } from "@/hooks/useFolderPath";
+import { invalidateFolderCache, invalidateAllFolderCache } from "@/modules/files/hooks/useFiles";
 
 function isFolderDescendant(
   folderId: string,
@@ -126,7 +127,6 @@ function DataRoomApp() {
     clearSelection,
     selectedIds,
     removeFile,
-    setFiles,
   } = useFileStore();
   const {
     files,
@@ -146,58 +146,67 @@ function DataRoomApp() {
     loadFolders();
   }, [loadFolders]);
 
-  // Clear stale files immediately when folder changes so MainPanel doesn't flash
-  // files from the previous folder while the new request is in-flight.
-  useEffect(() => {
-    setFiles([])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentFolderId]);
+  // Note: we intentionally do NOT clear files on folder change.
+  // The folder cache in useFiles provides instant display of cached data;
+  // old files stay visible only until the cache/fetch resolves (no blank flash).
 
   // Reload files when current folder changes (or when loadFiles identity changes, e.g. user login)
   useEffect(() => {
-    console.log('[Page] useEffect → loadFiles(), currentFolderId=', currentFolderId)
+    console.log('[NAV] loadFiles effect, currentFolderId=', currentFolderId)
     loadFiles();
   }, [loadFiles, currentFolderId]);
 
+  const allFilesLoadingRef = useRef(false)
   const loadAllFiles = useCallback(async () => {
     if (!user) {
       setAllFiles([]);
       return;
     }
-    console.log('[Page] loadAllFiles() called')
-    const data = await fileService.getFilesByOwner(user.uid);
-    console.log('[Page] loadAllFiles() done, count=', data.length, data.map(f => `${f.name}(folder=${f.folderId ?? 'null'})`))
-    setAllFiles(data);
+    if (allFilesLoadingRef.current) return
+    allFilesLoadingRef.current = true
+    try {
+      const data = await fileService.getFilesByOwner(user.uid);
+      setAllFiles(data);
+    } finally {
+      allFilesLoadingRef.current = false
+    }
   }, [user]);
 
-  // Keep allFiles in sync whenever the folder tree changes (folder moves/deletes/creates).
-  // loadAllFiles is excluded from deps intentionally — it is stable (depends only on user)
-  // and adding it would cause extra re-runs when unrelated state changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Keep allFiles in sync whenever the folder structure actually changes (ids set changes),
+  // not on every re-render that produces a new folders array reference.
   const loadAllFilesRef = useRef(loadAllFiles)
   useEffect(() => { loadAllFilesRef.current = loadAllFiles }, [loadAllFiles])
 
+  const folderIdsKey = folders.map((f) => f.id).join(',')
   useEffect(() => {
-    console.log('[Page] useEffect[folders] → loadAllFiles(), folders.length=', folders.length)
     void loadAllFilesRef.current();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folders]);
+  }, [folderIdsKey]);
 
-  // Wrappers that refresh allFiles after file mutations so Sidebar/DnD stay in sync
+  // Wrappers that refresh allFiles after file mutations so Sidebar/DnD stay in sync.
+  // Cache for the affected folder is invalidated so next loadFiles fetches fresh data.
   const handleUploadFiles = useCallback(async (browserFiles: File[]) => {
+    invalidateFolderCache(currentFolderId);
     await uploadFiles(browserFiles);
     void loadAllFiles();
-  }, [uploadFiles, loadAllFiles]);
+  }, [uploadFiles, loadAllFiles, currentFolderId]);
 
   const handleDeleteFile = useCallback(async (id: string) => {
+    invalidateFolderCache(currentFolderId);
     await deleteFile(id);
     void loadAllFiles();
-  }, [deleteFile, loadAllFiles]);
+  }, [deleteFile, loadAllFiles, currentFolderId]);
 
   const handleDeleteSelected = useCallback(async () => {
+    invalidateFolderCache(currentFolderId);
     await deleteSelected();
     void loadAllFiles();
-  }, [deleteSelected, loadAllFiles]);
+  }, [deleteSelected, loadAllFiles, currentFolderId]);
+
+  // DEBUG: track loading state changes
+  useEffect(() => {
+    console.log('[LOADING] filesLoading=', filesLoading, 'foldersLoading=', foldersLoading, 'combined=', filesLoading || foldersLoading)
+  })
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
 
@@ -284,6 +293,9 @@ function DataRoomApp() {
     const isFolder = folders.some((f) => f.id === activeId);
 
     if (isFile && file.folderId !== targetFolderId) {
+      // Invalidate both source and target folder caches so next visit is fresh
+      invalidateFolderCache(file.folderId);
+      invalidateFolderCache(targetFolderId);
       removeFile(activeId);
       setAllFiles((prev) =>
         prev.map((candidate) =>
@@ -334,7 +346,7 @@ function DataRoomApp() {
             onNavigate={navigate}
             onCreateFolder={createFolder}
             onRenameFolder={renameFolder}
-            onDeleteFolder={deleteFolder}
+            onDeleteFolder={async (id) => { invalidateAllFolderCache(); await deleteFolder(id); }}
             user={user}
             files={allFiles}
             onUploadFiles={handleUploadFiles}
@@ -466,7 +478,7 @@ function DataRoomApp() {
               currentFolderId={currentFolderId}
               activeDragId={activeDragId}
               selectedIds={selectedIds}
-              isLoading={filesLoading || foldersLoading}
+              isLoading={filesLoading}
               breadcrumbPath={breadcrumbPath}
               onNavigate={navigate}
               onOpenFile={openFile}
@@ -476,7 +488,7 @@ function DataRoomApp() {
               onUpload={handleUploadFiles}
               onFolderOpen={navigate}
               onFolderRename={renameFolder}
-              onFolderDelete={deleteFolder}
+              onFolderDelete={async (id) => { invalidateAllFolderCache(); await deleteFolder(id); }}
               onFolderCreate={createFolder}
               onToggleSelect={toggleSelection}
               onSelectAll={selectAll}

@@ -85,13 +85,12 @@ function SidebarFileNode({
   );
 
   return (
-    <motion.button
+    <button
       ref={setNodeRef}
-      layout
       className={cn(
         "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-base transition-[color,background-color] duration-150 hover:bg-accent",
         "text-foreground",
-        isDragging && "relative z-[60]",
+        isDragging && "relative z-[60] opacity-40",
         isOver && "bg-primary/20",
         isActive && "bg-primary/10 text-primary font-medium",
       )}
@@ -102,14 +101,10 @@ function SidebarFileNode({
       onClick={() => onOpenFile(file.id)}
       {...attributes}
       {...listeners}
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: isDragging ? 0.4 : 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
     >
       <FileIcon type={file.type} size={18} />
       <span className="truncate">{file.name}</span>
-    </motion.button>
+    </button>
   );
 }
 
@@ -374,17 +369,15 @@ function FolderNode({
                 Folder is empty
               </div>
             )}
-            <AnimatePresence initial={false}>
-              {filesInFolder.map((file) => (
-                <SidebarFileNode
-                  key={file.id}
-                  file={file}
-                  depth={depth + 1}
-                  isActive={file.id === activeFileId}
-                  onOpenFile={onOpenFile}
-                />
-              ))}
-            </AnimatePresence>
+            {filesInFolder.map((file) => (
+              <SidebarFileNode
+                key={file.id}
+                file={file}
+                depth={depth + 1}
+                isActive={file.id === activeFileId}
+                onOpenFile={onOpenFile}
+              />
+            ))}
           </motion.div>
         )}
       </AnimatePresence>
@@ -555,38 +548,28 @@ export function Sidebar({
             {favoriteFiles.length === 0 && favoriteFolders.length === 0 ? (
               <p className="px-1 py-2 text-xs text-muted-foreground/60">No favorites yet</p>
             ) : (
-              <AnimatePresence initial={false}>
+              <>
                 {favoriteFolders.map((folder) => (
-                  <motion.button
+                  <button
                     key={folder.id}
-                    layout
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
                     className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-base transition-colors hover:bg-accent"
                     onClick={() => onNavigate(folder.id)}
                   >
                     <FileIcon type="folder-filled" size={18} />
                     <span className="truncate">{folder.name}</span>
-                  </motion.button>
+                  </button>
                 ))}
                 {favoriteFiles.map((file) => (
-                  <motion.button
+                  <button
                     key={file.id}
-                    layout
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
                     className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-base transition-colors hover:bg-accent"
                     onClick={() => onOpenFile(file.id)}
                   >
                     <FileIcon type={file.type} size={18} />
                     <span className="truncate">{file.name}</span>
-                  </motion.button>
+                  </button>
                 ))}
-              </AnimatePresence>
+              </>
             )}
           </div>
         </div>
@@ -643,18 +626,16 @@ export function Sidebar({
               onOpenFile={onOpenFile}
             />
           ))}
-          <AnimatePresence initial={false}>
-            {rootFiles.map((file) => (
-              <SidebarFileNode
-                key={file.id}
-                file={file}
-                depth={0}
-                isRootFile
-                isActive={file.id === activeFileId}
-                onOpenFile={onOpenFile}
-              />
-            ))}
-          </AnimatePresence>
+          {rootFiles.map((file) => (
+            <SidebarFileNode
+              key={file.id}
+              file={file}
+              depth={0}
+              isRootFile
+              isActive={file.id === activeFileId}
+              onOpenFile={onOpenFile}
+            />
+          ))}
           {isDragging && (
             <div
               ref={setRootBottomRef}
