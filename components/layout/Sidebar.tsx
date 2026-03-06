@@ -9,7 +9,6 @@ import {
   Pencil,
   Check,
   X,
-  PanelLeftClose,
   LogOut,
   Upload,
 } from "lucide-react";
@@ -31,8 +30,6 @@ interface SidebarProps {
   onCreateFolder: (name: string, parentId: string | null) => void;
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
-  isSidebarCollapsed: boolean;
-  onToggleSidebar: () => void;
   user: AuthUser | null;
   files: FileMetadata[];
   onUploadFiles: (files: File[]) => void;
@@ -402,7 +399,6 @@ export function Sidebar({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
-  onToggleSidebar,
   user,
   files,
   onUploadFiles,
@@ -485,21 +481,31 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex h-full flex-col border-r border-border/40 bg-muted/30">
-      {/* Logo + collapse */}
-      <div className="flex items-center justify-between px-5 py-4">
-        <span className="text-2xl font-bold tracking-tight text-primary">
-          Data Room
+    <aside
+      className="relative flex h-full flex-col bg-muted/30"
+      style={{
+        borderRight: "1px solid transparent",
+        borderImage: "linear-gradient(to bottom, rgba(34,197,94,0.35) 0%, rgba(128,128,128,0.12) 100%) 1",
+      }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: "radial-gradient(circle at top left, rgba(34,197,94,0.2) 0%, transparent 45%)",
+          backgroundImage: [
+            "radial-gradient(circle at top left, rgba(34,197,94,0.2) 0%, transparent 45%)",
+            "radial-gradient(circle, rgba(34,197,94,0.12) 1px, transparent 1px)",
+          ].join(", "),
+          backgroundSize: "100% 100%, 20px 20px",
+          maskImage: "radial-gradient(circle at top left, black 0%, transparent 50%)",
+          WebkitMaskImage: "radial-gradient(circle at top left, black 0%, transparent 50%)",
+        }}
+      />
+      {/* Logo */}
+      <div className="relative flex items-center px-5 py-4">
+        <span className="relative font-[family-name:var(--font-space-grotesk)] text-2xl font-bold tracking-tight text-primary">
+          <span className="relative">Data Room</span>
         </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={onToggleSidebar}
-          title="Collapse sidebar"
-        >
-          <PanelLeftClose size={15} />
-        </Button>
       </div>
 
       <div className="flex flex-1 flex-col gap-8 overflow-y-auto px-5 pb-4">
@@ -518,7 +524,7 @@ export function Sidebar({
             />
             <Button
               variant="outline"
-              className="h-10 w-full justify-start rounded-lg px-3"
+              className="h-10 w-full justify-start rounded-lg px-3 backdrop-blur-md"
               onClick={() => uploadInputRef.current?.click()}
               title="Upload files"
             >
@@ -527,7 +533,7 @@ export function Sidebar({
             </Button>
             <Button
               variant="outline"
-              className="h-10 w-full justify-start rounded-lg px-3"
+              className="h-10 w-full justify-start rounded-lg px-3 backdrop-blur-md"
               onClick={() => {
                 setIsCreatingRoot(true);
                 setRootName("");
@@ -698,8 +704,8 @@ export function Sidebar({
               className="h-9 shrink-0 rounded-lg px-2 text-sm text-muted-foreground hover:text-foreground"
               onClick={onSignOut}
             >
-              <LogOut size={14} className="mr-2" />
               Sign out
+              <LogOut size={14} className="ml-2" />
             </Button>
           </div>
         </div>

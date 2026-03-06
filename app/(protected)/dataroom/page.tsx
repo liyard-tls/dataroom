@@ -27,7 +27,7 @@ import { useFileStore } from "@/store/fileStore";
 import { authService } from "@/modules/auth";
 import { fileService } from "@/modules/files/services/file.service";
 import { Button } from "@/components/ui/button";
-import { PanelLeftOpen, Download, Trash2 } from "lucide-react";
+import { PanelLeftOpen, PanelLeftClose, Download, Trash2 } from "lucide-react";
 import { FileIcon } from "@/components/common/FileIcon";
 import { useUIStore } from "@/store/uiStore";
 import { useAuthStore } from "@/store/authStore";
@@ -37,7 +37,11 @@ import { FileMetadata } from "@/types/file.types";
 import { Folder } from "@/types/folder.types";
 
 // Returns true if targetId is folderId itself or a descendant — prevents dropping a folder into itself
-function isFolderDescendant(folderId: string, targetId: string | null, folders: Folder[]): boolean {
+function isFolderDescendant(
+  folderId: string,
+  targetId: string | null,
+  folders: Folder[],
+): boolean {
   if (!targetId) return false;
   if (folderId === targetId) return true;
   const target = folders.find((f) => f.id === targetId);
@@ -47,7 +51,13 @@ function isFolderDescendant(folderId: string, targetId: string | null, folders: 
 
 function DataRoomApp() {
   const router = useRouter();
-  const { isSidebarCollapsed, toggleSidebar, favoriteIds, toggleFavorite, viewerFile } = useUIStore();
+  const {
+    isSidebarCollapsed,
+    toggleSidebar,
+    favoriteIds,
+    toggleFavorite,
+    viewerFile,
+  } = useUIStore();
   const user = useAuthStore((state) => state.user);
   const [allFiles, setAllFiles] = useState<FileMetadata[]>([]);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -63,8 +73,13 @@ function DataRoomApp() {
     setCurrentFolderId,
   } = useFolders();
 
-  const { toggleSelection, selectAll, clearSelection, selectedIds, removeFile } =
-    useFileStore();
+  const {
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    selectedIds,
+    removeFile,
+  } = useFileStore();
   const {
     files,
     isLoading: filesLoading,
@@ -122,7 +137,10 @@ function DataRoomApp() {
     const id = (event.active.id as string).replace(/^main-/, "");
     const isFolder = folders.some((f) => f.id === id);
     const isFile = allFiles.some((f) => f.id === id);
-    console.log("[dnd] dragStart", { id, type: isFolder ? "folder" : isFile ? "file" : "unknown" });
+    console.log("[dnd] dragStart", {
+      id,
+      type: isFolder ? "folder" : isFile ? "file" : "unknown",
+    });
     setActiveDragId(id);
   }
 
@@ -135,7 +153,10 @@ function DataRoomApp() {
     setActiveDragId(null);
 
     const { active, over } = event;
-    console.log("[dnd] dragEnd", { activeId: active.id, overId: over?.id ?? null });
+    console.log("[dnd] dragEnd", {
+      activeId: active.id,
+      overId: over?.id ?? null,
+    });
 
     if (!over) {
       console.log("[dnd] no drop target — cancelled");
@@ -151,9 +172,18 @@ function DataRoomApp() {
     // "folder-<id>" / "folder-root" / "folder-root-bottom" / "file-root-<id>" — Sidebar targets
     let targetFolderId: string | null;
     if (overId === "main-panel") {
-      targetFolderId = (over.data.current as { folderId: string | null } | undefined)?.folderId ?? null;
-      console.log("[dnd] dropped on main-panel, targetFolderId=", targetFolderId);
-    } else if (overId === "folder-root" || overId === "folder-root-bottom" || overId.startsWith("file-root-")) {
+      targetFolderId =
+        (over.data.current as { folderId: string | null } | undefined)
+          ?.folderId ?? null;
+      console.log(
+        "[dnd] dropped on main-panel, targetFolderId=",
+        targetFolderId,
+      );
+    } else if (
+      overId === "folder-root" ||
+      overId === "folder-root-bottom" ||
+      overId.startsWith("file-root-")
+    ) {
       targetFolderId = null;
     } else if (overId.startsWith("main-folder-")) {
       targetFolderId = overId.replace("main-folder-", "");
@@ -170,7 +200,12 @@ function DataRoomApp() {
     const isFile = !!file;
     const isFolder = folders.some((f) => f.id === activeId);
 
-    console.log("[dnd] resolving", { isFile, isFolder, targetFolderId, currentFolderId: file?.folderId });
+    console.log("[dnd] resolving", {
+      isFile,
+      isFolder,
+      targetFolderId,
+      currentFolderId: file?.folderId,
+    });
 
     if (isFile && file.folderId !== targetFolderId) {
       console.log("[dnd] moving file", activeId, "→", targetFolderId);
@@ -186,7 +221,11 @@ function DataRoomApp() {
       await moveFile(activeId, targetFolderId);
       // If file was moved INTO the currently open folder, reload to show it
       if (targetFolderId === currentFolderId) loadFiles();
-    } else if (isFolder && targetFolderId !== activeId && !isFolderDescendant(activeId, targetFolderId, folders)) {
+    } else if (
+      isFolder &&
+      targetFolderId !== activeId &&
+      !isFolderDescendant(activeId, targetFolderId, folders)
+    ) {
       console.log("[dnd] moving folder", activeId, "→", targetFolderId);
       moveFolder(activeId, targetFolderId);
     } else {
@@ -233,8 +272,6 @@ function DataRoomApp() {
             onCreateFolder={createFolder}
             onRenameFolder={renameFolder}
             onDeleteFolder={deleteFolder}
-            isSidebarCollapsed={isSidebarCollapsed}
-            onToggleSidebar={toggleSidebar}
             user={user}
             files={allFiles}
             onUploadFiles={uploadFiles}
@@ -249,21 +286,20 @@ function DataRoomApp() {
         {/* Right side: header + content */}
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex items-center gap-3 border-b bg-background px-6 py-2.5">
-            {isSidebarCollapsed && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={toggleSidebar}
-              >
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={toggleSidebar}
+            >
+              {isSidebarCollapsed ? (
                 <PanelLeftOpen size={15} />
-              </Button>
-            )}
-            <Breadcrumb
-              path={breadcrumbPath}
-              onNavigate={setCurrentFolderId}
-              className="ml-7"
-            />
+              ) : (
+                <PanelLeftClose size={15} />
+              )}
+            </Button>
+            <div className="h-5 w-px shrink-0 bg-border/100" />
+            <Breadcrumb path={breadcrumbPath} onNavigate={setCurrentFolderId} />
             <div className="flex-1" />
             {selectedIds.size > 0 && (
               <div className="flex items-center gap-2">
