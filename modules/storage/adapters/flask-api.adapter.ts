@@ -147,14 +147,19 @@ export class FlaskApiAdapter implements StorageAdapter {
   async getFilesByFolder(folderId: string | null): Promise<FileMetadata[]> {
     if (!_ownerId) return []
     const qs = folderId != null ? `?folder_id=${folderId}` : ''
-    const raw = await apiFetch<Record<string, unknown>[]>(`/files/${qs}`)
+    const url = `/files/${qs}`
+    console.log(`[Adapter] getFilesByFolder(${folderId ?? 'null'}) → GET ${url}`)
+    const raw = await apiFetch<Record<string, unknown>[]>(url)
+    console.log(`[Adapter] getFilesByFolder(${folderId ?? 'null'}) ← ${raw.length} files:`, raw.map(f => `${f.name}(folder=${f.folderId ?? 'null'})`))
     return raw.map(parseFileMetadata)
   }
 
   async getFilesByOwner(_ownerId: string): Promise<FileMetadata[]> {
     if (!_ownerId) return []
     // Returns all files across all folders for this owner
-    const raw = await apiFetch<Record<string, unknown>[]>('/files/')
+    console.log('[Adapter] getFilesByOwner → GET /files/?all=true')
+    const raw = await apiFetch<Record<string, unknown>[]>('/files/?all=true')
+    console.log(`[Adapter] getFilesByOwner ← ${raw.length} files:`, raw.map(f => `${f.name}(folder=${f.folderId ?? 'null'})`))
     return raw.map(parseFileMetadata)
   }
 

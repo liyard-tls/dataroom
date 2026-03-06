@@ -66,10 +66,18 @@ def upload_file():
 @files_bp.get("/")
 @require_owner
 def list_files():
-    folder_id = request.args.get("folder_id")  # None means root (no folder)
     query = FileRecord.query.filter_by(owner_id=g.owner_id)
-    if folder_id is not None:
-        query = query.filter_by(folder_id=folder_id)
+
+    if "folder_id" in request.args:
+        # Explicit folder_id param — filter by that folder
+        query = query.filter_by(folder_id=request.args["folder_id"])
+    elif request.args.get("all") == "true":
+        # ?all=true — return all files across all folders
+        pass
+    else:
+        # No params — return only root-level files (folder_id IS NULL)
+        query = query.filter(FileRecord.folder_id.is_(None))
+
     files = query.order_by(FileRecord.created_at.desc()).all()
     return jsonify([f.to_dict() for f in files])
 

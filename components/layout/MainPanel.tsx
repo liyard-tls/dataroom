@@ -753,7 +753,7 @@ export function MainPanel({
       onDrop={handleDrop}
     >
       {/* Column headers — list view only */}
-      {!isEmpty && viewMode === "list" && (
+      {viewMode === "list" && (
         <div
           className={cn(
             "flex items-center gap-3 border-b py-2.5 text-sm font-medium text-muted-foreground",

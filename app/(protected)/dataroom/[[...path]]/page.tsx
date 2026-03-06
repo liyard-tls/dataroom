@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
@@ -99,12 +99,17 @@ function DataRoomApp() {
 
   const navigate = useFolderNavigation(folders);
 
-  // Sync URL path → currentFolderId once folders are loaded
+  // Sync URL path → currentFolderId.
+  // Triggers on URL change OR when folders first load (0 → N).
+  // foldersRef lets us read latest folders without re-triggering on every folders update.
+  const foldersRef = useRef(folders)
+  useEffect(() => { foldersRef.current = folders }, [folders])
+  const foldersLoaded = folders.length > 0
+
   useEffect(() => {
-    if (folders.length === 0) return
-    const { folderId, found } = resolveFolderPath(pathSegments, folders)
+    if (!foldersLoaded) return
+    const { folderId, found } = resolveFolderPath(pathSegments, foldersRef.current)
     if (!found) {
-      // Folder not found (renamed/deleted) — redirect to root
       router.replace('/dataroom')
       return
     }
@@ -112,7 +117,7 @@ function DataRoomApp() {
       setCurrentFolderId(folderId)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folders, pathSegments.join('/')])
+  }, [foldersLoaded, pathSegments.join('/')])
 
   const {
     toggleSelection,
@@ -120,6 +125,7 @@ function DataRoomApp() {
     clearSelection,
     selectedIds,
     removeFile,
+    setFiles,
   } = useFileStore();
   const {
     files,
@@ -139,8 +145,16 @@ function DataRoomApp() {
     loadFolders();
   }, [loadFolders]);
 
-  // Reload files when current folder changes
+  // Clear stale files immediately when folder changes so MainPanel doesn't flash
+  // files from the previous folder while the new request is in-flight.
   useEffect(() => {
+    setFiles([])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFolderId]);
+
+  // Reload files when current folder changes (or when loadFiles identity changes, e.g. user login)
+  useEffect(() => {
+    console.log('[Page] useEffect → loadFiles(), currentFolderId=', currentFolderId)
     loadFiles();
   }, [loadFiles, currentFolderId]);
 
@@ -149,19 +163,40 @@ function DataRoomApp() {
       setAllFiles([]);
       return;
     }
+    console.log('[Page] loadAllFiles() called')
     const data = await fileService.getFilesByOwner(user.uid);
+    console.log('[Page] loadAllFiles() done, count=', data.length, data.map(f => `${f.name}(folder=${f.folderId ?? 'null'})`))
     setAllFiles(data);
   }, [user]);
 
-  // Keep allFiles in sync when folder list changes (folder moves/deletes)
-  useEffect(() => {
-    void loadAllFiles();
-  }, [loadAllFiles, folders]);
+  // Keep allFiles in sync whenever the folder tree changes (folder moves/deletes/creates).
+  // loadAllFiles is excluded from deps intentionally — it is stable (depends only on user)
+  // and adding it would cause extra re-runs when unrelated state changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const loadAllFilesRef = useRef(loadAllFiles)
+  useEffect(() => { loadAllFilesRef.current = loadAllFiles }, [loadAllFiles])
 
-  // Keep allFiles in sync when files in current folder change (uploads, deletes, renames)
   useEffect(() => {
+    console.log('[Page] useEffect[folders] → loadAllFiles(), folders.length=', folders.length)
+    void loadAllFilesRef.current();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folders]);
+
+  // Wrappers that refresh allFiles after file mutations so Sidebar/DnD stay in sync
+  const handleUploadFiles = useCallback(async (browserFiles: File[]) => {
+    await uploadFiles(browserFiles);
     void loadAllFiles();
-  }, [loadAllFiles, files]);
+  }, [uploadFiles, loadAllFiles]);
+
+  const handleDeleteFile = useCallback(async (id: string) => {
+    await deleteFile(id);
+    void loadAllFiles();
+  }, [deleteFile, loadAllFiles]);
+
+  const handleDeleteSelected = useCallback(async () => {
+    await deleteSelected();
+    void loadAllFiles();
+  }, [deleteSelected, loadAllFiles]);
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
 
@@ -301,7 +336,7 @@ function DataRoomApp() {
             onDeleteFolder={deleteFolder}
             user={user}
             files={allFiles}
-            onUploadFiles={uploadFiles}
+            onUploadFiles={handleUploadFiles}
             onOpenFile={openFile}
             onSignOut={handleSignOut}
             isDragging={activeDragId !== null}
@@ -330,7 +365,7 @@ function DataRoomApp() {
                 <Button
                   variant="outline" size="sm"
                   className="h-8 gap-1.5 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={deleteSelected}
+                  onClick={handleDeleteSelected}
                 >
                   <Trash2 size={13} />
                   Delete
@@ -435,9 +470,9 @@ function DataRoomApp() {
               onNavigate={navigate}
               onOpenFile={openFile}
               onRenameFile={renameFile}
-              onDeleteFile={deleteFile}
-              onDeleteSelected={deleteSelected}
-              onUpload={uploadFiles}
+              onDeleteFile={handleDeleteFile}
+              onDeleteSelected={handleDeleteSelected}
+              onUpload={handleUploadFiles}
               onFolderOpen={navigate}
               onFolderRename={renameFolder}
               onFolderDelete={deleteFolder}
