@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: dataroom
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-dataroom}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,9 +25,8 @@ services:
     ports:
       - "5001:5001"
     environment:
-      FLASK_ENV: development
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/dataroom
-      # Override these in .env or via docker-compose override
+      FLASK_ENV: ${FLASK_ENV:-development}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-dataroom}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       FERNET_KEY: ${FERNET_KEY}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
