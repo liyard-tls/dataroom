@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useDroppable } from "@dnd-kit/core";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -109,6 +110,21 @@ function FolderRow({
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(folder.name);
+  const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `main-folder-${folder.id}` });
+  const { setNodeRef: setDragRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `main-${folder.id}` });
+  const setNodeRef = useCallback((node: HTMLElement | null) => { setDropRef(node); setDragRef(node); }, [setDropRef, setDragRef]);
+
+  // Auto-navigate into folder when hovering during DnD
+  useEffect(() => {
+    if (isOver) {
+      expandTimerRef.current = setTimeout(() => onOpen(), 1000);
+    } else {
+      if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; }
+    }
+    return () => { if (expandTimerRef.current) clearTimeout(expandTimerRef.current); };
+  }, [isOver, onOpen]);
 
   function handleRenameSubmit() {
     const trimmed = nameValue.trim();
@@ -118,14 +134,18 @@ function FolderRow({
 
   return (
     <motion.div
+      ref={setNodeRef}
       layout
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
+      style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
       className={cn(
         "group flex items-center gap-3 rounded-lg py-2 transition-colors",
         ROW_PX,
         isSelected ? "bg-primary/10" : "hover:bg-accent",
+        isOver && "bg-primary/15 ring-1 ring-inset ring-primary/30",
+        isDragging && "opacity-40",
       )}
       onDoubleClick={onOpen}
     >
@@ -142,12 +162,19 @@ function FolderRow({
         />
       </div>
 
-      <div className={cn("flex items-center gap-2 overflow-hidden", COL_NAME)}>
-        <FileIcon
-          type={isNotEmpty ? "folder-filled" : "folder"}
-          size={20}
-          className="shrink-0"
-        />
+      <div
+        className={cn("flex min-w-0 flex-1 cursor-grab items-center gap-2 overflow-hidden active:cursor-grabbing", COL_NAME)}
+        {...attributes}
+        {...listeners}
+        onClick={stopRowPropagation}
+        onDoubleClick={(e) => { e.stopPropagation(); onOpen(); }}
+      >
+        <span className="shrink-0">
+          <FileIcon
+            type={isNotEmpty ? "folder-filled" : "folder"}
+            size={20}
+          />
+        </span>
         {isRenaming ? (
           <input
             autoFocus
@@ -162,14 +189,16 @@ function FolderRow({
               }
             }}
             className="flex-1 rounded border border-primary bg-background px-1 text-sm outline-none"
-            onClick={stopRowPropagation}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           />
         ) : (
           <span className="truncate text-sm">{folder.name}</span>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-          onDoubleClick={stopRowPropagation}
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
           className={cn(
             "ml-1 shrink-0 rounded p-0.5 transition-colors",
             isFavorite
@@ -251,6 +280,7 @@ function FileRow({
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(file.name);
+  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `main-${file.id}` });
 
   function handleRenameSubmit() {
     const trimmed = nameValue.trim();
@@ -260,13 +290,16 @@ function FileRow({
 
   return (
     <motion.div
+      ref={setNodeRef}
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
+      style={{ transform: isDragging ? undefined : CSS.Translate.toString(transform) }}
       className={cn(
         "group flex items-center gap-3 rounded-lg py-2 transition-colors",
         ROW_PX,
         isSelected ? "bg-primary/10" : "hover:bg-accent",
+        isDragging && "opacity-40",
       )}
       onDoubleClick={onOpen}
     >
@@ -283,8 +316,16 @@ function FileRow({
         />
       </div>
 
-      <div className={cn("flex items-center gap-2 overflow-hidden", COL_NAME)}>
-        <FileIcon type={file.type} size={18} className="shrink-0" />
+      <div
+        className={cn("flex min-w-0 flex-1 cursor-grab items-center gap-2 overflow-hidden active:cursor-grabbing", COL_NAME)}
+        {...attributes}
+        {...listeners}
+        onClick={stopRowPropagation}
+        onDoubleClick={(e) => { e.stopPropagation(); onOpen(); }}
+      >
+        <span className="shrink-0">
+          <FileIcon type={file.type} size={18} />
+        </span>
         {isRenaming ? (
           <input
             autoFocus
@@ -299,14 +340,16 @@ function FileRow({
               }
             }}
             className="flex-1 rounded border border-primary bg-background px-1 text-sm outline-none"
-            onClick={stopRowPropagation}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           />
         ) : (
           <span className="truncate text-sm">{file.name}</span>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-          onDoubleClick={stopRowPropagation}
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
           className={cn(
             "ml-1 shrink-0 rounded p-0.5 transition-colors",
             isFavorite

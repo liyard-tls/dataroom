@@ -108,7 +108,8 @@ function DataRoomApp() {
   }, []);
 
   function handleDragStart(event: DragStartEvent) {
-    const id = event.active.id as string;
+    // Strip "main-" prefix from MainPanel draggable IDs
+    const id = (event.active.id as string).replace(/^main-/, "");
     const isFolder = folders.some((f) => f.id === id);
     const isFile = allFiles.some((f) => f.id === id);
     console.log("[dnd] dragStart", { id, type: isFolder ? "folder" : isFile ? "file" : "unknown" });
@@ -120,7 +121,7 @@ function DataRoomApp() {
     setActiveDragId(null);
   }
 
-  function handleDragEnd(event: DragEndEvent) {
+  async function handleDragEnd(event: DragEndEvent) {
     setActiveDragId(null);
 
     const { active, over } = event;
@@ -131,17 +132,21 @@ function DataRoomApp() {
       return;
     }
 
-    const activeId = active.id as string;
+    // Strip "main-" prefix added to MainPanel draggable IDs to avoid conflicts with Sidebar IDs
+    const rawActiveId = (active.id as string).replace(/^main-/, "");
     const overId = over.id as string;
 
     // Extract target folder ID from droppable ID.
-    // "main-panel" carries the current folder in its data; sidebar uses "folder-<id>" / "folder-root"
+    // "main-panel" — current folder via data; "main-folder-<id>" — MainPanel folder row;
+    // "folder-<id>" / "folder-root" / "folder-root-bottom" / "file-root-<id>" — Sidebar targets
     let targetFolderId: string | null;
     if (overId === "main-panel") {
       targetFolderId = (over.data.current as { folderId: string | null } | undefined)?.folderId ?? null;
       console.log("[dnd] dropped on main-panel, targetFolderId=", targetFolderId);
     } else if (overId === "folder-root" || overId === "folder-root-bottom" || overId.startsWith("file-root-")) {
       targetFolderId = null;
+    } else if (overId.startsWith("main-folder-")) {
+      targetFolderId = overId.replace("main-folder-", "");
     } else if (overId.startsWith("folder-")) {
       targetFolderId = overId.replace("folder-", "");
     } else {
@@ -149,6 +154,7 @@ function DataRoomApp() {
       return;
     }
 
+    const activeId = rawActiveId;
     // Determine if the dragged item is a file or folder
     const file = allFiles.find((f) => f.id === activeId);
     const isFile = !!file;
@@ -167,7 +173,9 @@ function DataRoomApp() {
             : candidate,
         ),
       );
-      moveFile(activeId, targetFolderId);
+      await moveFile(activeId, targetFolderId);
+      // If file was moved INTO the currently open folder, reload to show it
+      if (targetFolderId === currentFolderId) loadFiles();
     } else if (isFolder && targetFolderId !== activeId) {
       console.log("[dnd] moving folder", activeId, "→", targetFolderId);
       moveFolder(activeId, targetFolderId);
@@ -308,7 +316,7 @@ function DataRoomApp() {
 
       <DragOverlay dropAnimation={null} zIndex={1200}>
         {draggedFolder && (
-          <div className="pointer-events-none flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
+          <div className="pointer-events-none flex items-center gap-2 text-base text-foreground">
             <FileIcon
               type={draggedFolderHasContent ? "folder-filled" : "folder"}
               size={18}
@@ -317,7 +325,7 @@ function DataRoomApp() {
           </div>
         )}
         {draggedFile && (
-          <div className="pointer-events-none flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-base text-foreground shadow-xl">
+          <div className="pointer-events-none flex items-center gap-2 text-base text-foreground">
             <FileIcon type={draggedFile.type} size={18} />
             <span className="max-w-[22rem] truncate">{draggedFile.name}</span>
           </div>

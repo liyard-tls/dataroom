@@ -180,7 +180,7 @@ function FolderNode({
     if (isOver && !isExpanded) {
       expandTimerRef.current = setTimeout(() => {
         setIsExpanded(true);
-      }, 220);
+      }, 1000);
     }
 
     if (!isOver && expandTimerRef.current) {
