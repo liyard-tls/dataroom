@@ -5,12 +5,12 @@
  */
 
 export const themeConfig = {
-  // HSL values for the accent color (green)
+  // HSL values for the accent color
   // These map to --primary CSS variable in globals.css
   accent: {
-    hsl: '142 71% 45%',
-    hslDark: '142 71% 45%',
-    name: 'green',
+    hsl: '0 0% 45%',
+    hslDark: '0 0% 75%',
+    name: 'grey',
   },
 
   // Default theme on first load
@@ -18,4 +18,16 @@ export const themeConfig = {
 
   // Border radius scale
   radius: '0.5rem',
+
+  // File/folder icon colors
+  fileIconColors: {
+    folder:          'text-primary',
+    'folder-filled': 'text-primary',
+    pdf:             'text-primary',
+    image:           'text-primary',
+    video:           'text-primary',
+    text:            'text-primary',
+    md:              'text-primary',
+    other:           'text-primary',
+  },
 } as const

@@ -8,6 +8,7 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { FileType } from '@/types/file.types'
+import { themeConfig } from '@/config/theme.config'
 import { cn } from '@/lib/utils'
 
 interface FileIconProps {
@@ -16,24 +17,25 @@ interface FileIconProps {
   size?: number
 }
 
-const iconConfig: Record<FileType | 'folder' | 'folder-filled', { icon: React.ElementType; color: string }> = {
-  folder: { icon: Folder, color: 'text-yellow-500' },
-  'folder-filled': { icon: Folder, color: 'text-yellow-500' },
-  pdf:    { icon: FileText, color: 'text-red-500' },
-  image:  { icon: FileImage, color: 'text-green-500' },
-  video:  { icon: FileVideo, color: 'text-blue-500' },
-  text:   { icon: FileCode, color: 'text-purple-500' },
-  md:     { icon: BookOpen, color: 'text-cyan-500' },
-  other:  { icon: File, color: 'text-muted-foreground' },
+const iconConfig: Record<FileType | 'folder' | 'folder-filled', { icon: React.ElementType }> = {
+  folder:          { icon: Folder },
+  'folder-filled': { icon: Folder },
+  pdf:             { icon: FileText },
+  image:           { icon: FileImage },
+  video:           { icon: FileVideo },
+  text:            { icon: FileCode },
+  md:              { icon: BookOpen },
+  other:           { icon: File },
 }
 
 export function FileIcon({ type, className, size = 20 }: FileIconProps) {
-  const { icon: Icon, color } = iconConfig[type] ?? iconConfig.other
+  const { icon: Icon } = iconConfig[type] ?? iconConfig.other
+  const color = themeConfig.fileIconColors[type] ?? themeConfig.fileIconColors.other
   return (
     <Icon
       size={size}
       style={{ width: size, height: size, flexShrink: 0 }}
-      className={cn(color, type === 'folder-filled' && 'fill-yellow-500/35', className)}
+      className={cn(color, type === 'folder-filled' && 'fill-primary/20', className)}
     />
   )
 }
