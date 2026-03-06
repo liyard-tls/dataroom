@@ -11,15 +11,15 @@ export function useAuthListener() {
 
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChanged(async (user) => {
-      setUser(user)
-      setLoading(false)
-
-      // When using the Flask adapter, pass the Firebase UID to the adapter
-      // so it can include it in X-Owner-ID request headers.
+      // Set the owner ID BEFORE updating React state so that any useEffect
+      // triggered by setUser/setLoading will already see _ownerId populated.
       if (storageConfig.adapter === 'flask') {
         const { setOwnerId } = await import('@/modules/storage/adapters/flask-api.adapter')
         setOwnerId(user?.uid ?? '')
       }
+
+      setUser(user)
+      setLoading(false)
     })
     return unsubscribe
   }, [setUser, setLoading])

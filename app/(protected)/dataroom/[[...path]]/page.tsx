@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
   DragEndEvent,
@@ -37,17 +38,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PanelLeftOpen, PanelLeftClose, Download, Trash2, LayoutGrid, List, ArrowUpDown, ListFilter, ArrowUp, ArrowDown, Check } from "lucide-react";
+import { PanelLeftOpen, PanelLeftClose, Download, Trash2, LayoutGrid, List, ArrowUpDown, ListFilter, ArrowUp, ArrowDown } from "lucide-react";
 import { FileType } from "@/types/file.types";
 import { FileIcon } from "@/components/common/FileIcon";
 import { useUIStore } from "@/store/uiStore";
 import { useAuthStore } from "@/store/authStore";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { FileMetadata } from "@/types/file.types";
 import { Folder } from "@/types/folder.types";
+import { resolveFolderPath, useFolderNavigation } from "@/hooks/useFolderPath";
 
-// Returns true if targetId is folderId itself or a descendant — prevents dropping a folder into itself
 function isFolderDescendant(
   folderId: string,
   targetId: string | null,
@@ -62,6 +62,14 @@ function isFolderDescendant(
 
 function DataRoomApp() {
   const router = useRouter();
+  const params = useParams();
+  // params.path is string[] for [[...path]] or undefined at root
+  const pathSegments: string[] = Array.isArray(params.path)
+    ? params.path
+    : params.path
+      ? [params.path]
+      : [];
+
   const {
     isSidebarCollapsed,
     toggleSidebar,
@@ -76,6 +84,7 @@ function DataRoomApp() {
   const [sortField, setSortField] = useState<"name" | "size" | "updatedAt">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterTypes, setFilterTypes] = useState<Set<FileType | "folder">>(new Set());
+
   const {
     folders,
     currentFolderId,
@@ -87,6 +96,23 @@ function DataRoomApp() {
     moveFolder,
     setCurrentFolderId,
   } = useFolders();
+
+  const navigate = useFolderNavigation(folders);
+
+  // Sync URL path → currentFolderId once folders are loaded
+  useEffect(() => {
+    if (folders.length === 0) return
+    const { folderId, found } = resolveFolderPath(pathSegments, folders)
+    if (!found) {
+      // Folder not found (renamed/deleted) — redirect to root
+      router.replace('/dataroom')
+      return
+    }
+    if (folderId !== currentFolderId) {
+      setCurrentFolderId(folderId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folders, pathSegments.join('/')])
 
   const {
     toggleSelection,
@@ -139,14 +165,12 @@ function DataRoomApp() {
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
 
-  // Apply filter then sort to files; sort folders (folders always on top)
   const displayedFiles = useMemo(() => {
-    // If only "folder" is selected (no file types), show no files
     const fileTypeFilters = [...filterTypes].filter((t) => t !== "folder") as FileType[];
     let result = fileTypeFilters.length > 0
       ? files.filter((f) => fileTypeFilters.includes(f.type))
       : filterTypes.has("folder") && filterTypes.size === 1
-        ? [] // only "folder" selected — hide all files
+        ? []
         : files;
     result = [...result].sort((a, b) => {
       let cmp = 0;
@@ -160,11 +184,9 @@ function DataRoomApp() {
 
   const displayedFolders = useMemo(() => {
     const children = folders.filter((f) => f.parentId === currentFolderId);
-    // If filter is active and "folder" is not selected, hide folders
     const hideFolders = filterTypes.size > 0 && !filterTypes.has("folder");
     if (hideFolders) return [];
     return [...children].sort((a, b) => {
-      // Folders: size field is N/A so fall back to name for size sort
       if (sortField === "name") return sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       if (sortField === "size") return sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       const cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
@@ -172,13 +194,11 @@ function DataRoomApp() {
     });
   }, [folders, currentFolderId, sortField, sortDir, filterTypes]);
 
-  // DnD sensors — require 8px movement to start drag to avoid accidental drags on clicks
+  // DnD
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  // Try pointerWithin first (precise), fall back to rectIntersection (works even
-  // when the pointer is over the DragOverlay or an overflow-hidden container)
   const collisionDetection: CollisionDetection = useCallback((args) => {
     const pointerHits = pointerWithin(args);
     if (pointerHits.length > 0) return pointerHits;
@@ -186,52 +206,25 @@ function DataRoomApp() {
   }, []);
 
   function handleDragStart(event: DragStartEvent) {
-    // Strip "main-" prefix from MainPanel draggable IDs
     const id = (event.active.id as string).replace(/^main-/, "");
-    const isFolder = folders.some((f) => f.id === id);
-    const isFile = allFiles.some((f) => f.id === id);
-    console.log("[dnd] dragStart", {
-      id,
-      type: isFolder ? "folder" : isFile ? "file" : "unknown",
-    });
     setActiveDragId(id);
   }
 
   function handleDragCancel() {
-    console.log("[dnd] dragCancel");
     setActiveDragId(null);
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     setActiveDragId(null);
-
     const { active, over } = event;
-    console.log("[dnd] dragEnd", {
-      activeId: active.id,
-      overId: over?.id ?? null,
-    });
+    if (!over) return;
 
-    if (!over) {
-      console.log("[dnd] no drop target — cancelled");
-      return;
-    }
-
-    // Strip "main-" prefix added to MainPanel draggable IDs to avoid conflicts with Sidebar IDs
     const rawActiveId = (active.id as string).replace(/^main-/, "");
     const overId = over.id as string;
 
-    // Extract target folder ID from droppable ID.
-    // "main-panel" — current folder via data; "main-folder-<id>" — MainPanel folder row;
-    // "folder-<id>" / "folder-root" / "folder-root-bottom" / "file-root-<id>" — Sidebar targets
     let targetFolderId: string | null;
     if (overId === "main-panel") {
-      targetFolderId =
-        (over.data.current as { folderId: string | null } | undefined)
-          ?.folderId ?? null;
-      console.log(
-        "[dnd] dropped on main-panel, targetFolderId=",
-        targetFolderId,
-      );
+      targetFolderId = (over.data.current as { folderId: string | null } | undefined)?.folderId ?? null;
     } else if (
       overId === "folder-root" ||
       overId === "folder-root-bottom" ||
@@ -246,46 +239,29 @@ function DataRoomApp() {
     } else if (overId.startsWith("folder-")) {
       targetFolderId = overId.replace("folder-", "");
     } else {
-      console.log("[dnd] dropped on non-droppable target, ignoring:", overId);
       return;
     }
 
     const activeId = rawActiveId;
-    // Determine if the dragged item is a file or folder
     const file = allFiles.find((f) => f.id === activeId);
     const isFile = !!file;
     const isFolder = folders.some((f) => f.id === activeId);
 
-    console.log("[dnd] resolving", {
-      isFile,
-      isFolder,
-      targetFolderId,
-      currentFolderId: file?.folderId,
-    });
-
     if (isFile && file.folderId !== targetFolderId) {
-      console.log("[dnd] moving file", activeId, "→", targetFolderId);
-      // Optimistic update: remove from current folder list + update allFiles
       removeFile(activeId);
       setAllFiles((prev) =>
         prev.map((candidate) =>
-          candidate.id === activeId
-            ? { ...candidate, folderId: targetFolderId }
-            : candidate,
+          candidate.id === activeId ? { ...candidate, folderId: targetFolderId } : candidate,
         ),
       );
       await moveFile(activeId, targetFolderId);
-      // If file was moved INTO the currently open folder, reload to show it
       if (targetFolderId === currentFolderId) loadFiles();
     } else if (
       isFolder &&
       targetFolderId !== activeId &&
       !isFolderDescendant(activeId, targetFolderId, folders)
     ) {
-      console.log("[dnd] moving folder", activeId, "→", targetFolderId);
       moveFolder(activeId, targetFolderId);
-    } else {
-      console.log("[dnd] no-op: same location or unknown item");
     }
   }
 
@@ -294,12 +270,8 @@ function DataRoomApp() {
     router.replace("/login");
   }
 
-  const draggedFolder = activeDragId
-    ? folders.find((f) => f.id === activeDragId)
-    : undefined;
-  const draggedFile = activeDragId
-    ? allFiles.find((f) => f.id === activeDragId)
-    : undefined;
+  const draggedFolder = activeDragId ? folders.find((f) => f.id === activeDragId) : undefined;
+  const draggedFile = activeDragId ? allFiles.find((f) => f.id === activeDragId) : undefined;
   const draggedFolderHasContent =
     !!draggedFolder &&
     (folders.some((f) => f.parentId === draggedFolder.id) ||
@@ -314,7 +286,6 @@ function DataRoomApp() {
       onDragEnd={handleDragEnd}
     >
       <div className="flex h-screen overflow-hidden">
-        {/* Sidebar — full height, contains logo + nav */}
         <div
           className={cn(
             "w-[22.5rem] flex-shrink-0 overflow-hidden transition-[margin] duration-300 ease-out",
@@ -324,7 +295,7 @@ function DataRoomApp() {
           <Sidebar
             folders={folders}
             currentFolderId={currentFolderId}
-            onNavigate={setCurrentFolderId}
+            onNavigate={navigate}
             onCreateFolder={createFolder}
             onRenameFolder={renameFolder}
             onDeleteFolder={deleteFolder}
@@ -339,42 +310,25 @@ function DataRoomApp() {
           />
         </div>
 
-        {/* Right side: header + content */}
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex items-center gap-3 border-b bg-background px-6 py-2.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={toggleSidebar}
-            >
-              {isSidebarCollapsed ? (
-                <PanelLeftOpen size={15} />
-              ) : (
-                <PanelLeftClose size={15} />
-              )}
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleSidebar}>
+              {isSidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
             </Button>
             <div className="h-5 w-px shrink-0 bg-border/100" />
-            <Breadcrumb path={breadcrumbPath} onNavigate={setCurrentFolderId} />
+            <Breadcrumb path={breadcrumbPath} onNavigate={navigate} />
             <div className="flex-1" />
             {selectedIds.size > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
-                  {selectedIds.size} item{selectedIds.size !== 1 ? "s" : ""}{" "}
-                  selected
+                  {selectedIds.size} item{selectedIds.size !== 1 ? "s" : ""} selected
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5"
-                  onClick={() => downloadSelected(folders)}
-                >
+                <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => downloadSelected(folders)}>
                   <Download size={13} />
                   Download
                 </Button>
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="outline" size="sm"
                   className="h-8 gap-1.5 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={deleteSelected}
                 >
@@ -383,7 +337,6 @@ function DataRoomApp() {
                 </Button>
               </div>
             )}
-            {/* Sort */}
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-muted-foreground">
@@ -410,12 +363,10 @@ function DataRoomApp() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Filter by type */}
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="outline" size="sm"
                   className={cn("h-8 gap-1.5", filterTypes.size > 0 ? "border-primary text-primary" : "text-muted-foreground")}
                 >
                   <ListFilter size={13} />
@@ -459,22 +410,10 @@ function DataRoomApp() {
             </DropdownMenu>
 
             <div className="flex items-center rounded-lg border border-border/60 p-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-7 w-7", viewMode === "list" && "bg-accent")}
-                onClick={() => setViewMode("list")}
-                title="List view"
-              >
+              <Button variant="ghost" size="icon" className={cn("h-7 w-7", viewMode === "list" && "bg-accent")} onClick={() => setViewMode("list")} title="List view">
                 <List size={14} />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-7 w-7", viewMode === "grid" && "bg-accent")}
-                onClick={() => setViewMode("grid")}
-                title="Grid view"
-              >
+              <Button variant="ghost" size="icon" className={cn("h-7 w-7", viewMode === "grid" && "bg-accent")} onClick={() => setViewMode("grid")} title="Grid view">
                 <LayoutGrid size={14} />
               </Button>
             </div>
@@ -493,13 +432,13 @@ function DataRoomApp() {
               selectedIds={selectedIds}
               isLoading={filesLoading || foldersLoading}
               breadcrumbPath={breadcrumbPath}
-              onNavigate={setCurrentFolderId}
+              onNavigate={navigate}
               onOpenFile={openFile}
               onRenameFile={renameFile}
               onDeleteFile={deleteFile}
               onDeleteSelected={deleteSelected}
               onUpload={uploadFiles}
-              onFolderOpen={setCurrentFolderId}
+              onFolderOpen={navigate}
               onFolderRename={renameFolder}
               onFolderDelete={deleteFolder}
               onFolderCreate={createFolder}
@@ -517,10 +456,7 @@ function DataRoomApp() {
       <DragOverlay dropAnimation={null} zIndex={1200}>
         {draggedFolder && (
           <div className="pointer-events-none flex items-center gap-2 text-base text-foreground">
-            <FileIcon
-              type={draggedFolderHasContent ? "folder-filled" : "folder"}
-              size={18}
-            />
+            <FileIcon type={draggedFolderHasContent ? "folder-filled" : "folder"} size={18} />
             <span className="max-w-[22rem] truncate">{draggedFolder.name}</span>
           </div>
         )}

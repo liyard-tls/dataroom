@@ -31,6 +31,11 @@ export function setOwnerId(uid: string) {
   _ownerId = uid
 }
 
+/** Returns true if an owner ID has been set (i.e. user is authenticated). */
+export function isOwnerIdSet(): boolean {
+  return !!_ownerId
+}
+
 function headers(): HeadersInit {
   return {
     'Content-Type': 'application/json',
@@ -93,6 +98,7 @@ export class FlaskApiAdapter implements StorageAdapter {
   // ---------------------------------------------------------------------------
 
   async getFolderTree(_ownerId: string): Promise<Folder[]> {
+    if (!_ownerId) return []
     // ownerId is sent via X-Owner-ID header; the param is ignored server-side
     const raw = await apiFetch<Record<string, unknown>[]>('/folders/')
     return raw.map(parseFolder)
@@ -139,12 +145,14 @@ export class FlaskApiAdapter implements StorageAdapter {
   // ---------------------------------------------------------------------------
 
   async getFilesByFolder(folderId: string | null): Promise<FileMetadata[]> {
+    if (!_ownerId) return []
     const qs = folderId != null ? `?folder_id=${folderId}` : ''
     const raw = await apiFetch<Record<string, unknown>[]>(`/files/${qs}`)
     return raw.map(parseFileMetadata)
   }
 
   async getFilesByOwner(_ownerId: string): Promise<FileMetadata[]> {
+    if (!_ownerId) return []
     // Returns all files across all folders for this owner
     const raw = await apiFetch<Record<string, unknown>[]>('/files/')
     return raw.map(parseFileMetadata)
@@ -228,6 +236,7 @@ export class FlaskApiAdapter implements StorageAdapter {
   // ---------------------------------------------------------------------------
 
   async search({ query, fileTypeFilter }: SearchQuery): Promise<SearchResult[]> {
+    if (!_ownerId) return []
     const qs = new URLSearchParams({ q: query })
     if (fileTypeFilter) qs.set('type', fileTypeFilter)
     return apiFetch<SearchResult[]>(`/search?${qs}`)
