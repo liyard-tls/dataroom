@@ -28,7 +28,7 @@ import { useFileStore } from "@/store/fileStore";
 import { authService } from "@/modules/auth";
 import { fileService } from "@/modules/files/services/file.service";
 import { Button } from "@/components/ui/button";
-import { PanelLeftOpen, PanelLeftClose, Download, Trash2 } from "lucide-react";
+import { PanelLeftOpen, PanelLeftClose, Download, Trash2, LayoutGrid, List } from "lucide-react";
 import { FileIcon } from "@/components/common/FileIcon";
 import { useUIStore } from "@/store/uiStore";
 import { useAuthStore } from "@/store/authStore";
@@ -62,6 +62,7 @@ function DataRoomApp() {
   const user = useAuthStore((state) => state.user);
   const [allFiles, setAllFiles] = useState<FileMetadata[]>([]);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const {
     folders,
     currentFolderId,
@@ -333,6 +334,26 @@ function DataRoomApp() {
                 </Button>
               </div>
             )}
+            <div className="flex items-center rounded-lg border border-border/60 p-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-7 w-7", viewMode === "list" && "bg-accent")}
+                onClick={() => setViewMode("list")}
+                title="List view"
+              >
+                <List size={14} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-7 w-7", viewMode === "grid" && "bg-accent")}
+                onClick={() => setViewMode("grid")}
+                title="Grid view"
+              >
+                <LayoutGrid size={14} />
+              </Button>
+            </div>
             <SearchBar />
             <ThemeToggle />
           </header>
@@ -362,6 +383,7 @@ function DataRoomApp() {
               onClearSelection={clearSelection}
               favoriteIds={favoriteIds}
               onToggleFavorite={toggleFavorite}
+              viewMode={viewMode}
             />
           </main>
         </div>
