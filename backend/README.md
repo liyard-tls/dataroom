@@ -12,12 +12,29 @@ Flask + PostgreSQL backend for the Data Room application.
 
 ## Setup
 
-### 1. Prerequisites
+### Option A — Docker Compose (recommended)
+
+```bash
+cd backend
+cp .env.example .env   # fill in FERNET_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+docker compose up --build
+```
+
+The entrypoint automatically runs migrations on first start.
+API is available at `http://localhost:5001`.
+
+> To generate a Fernet key: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+
+---
+
+### Option B — Local Python
+
+#### 1. Prerequisites
 
 - Python 3.11+
 - PostgreSQL running locally (or via Docker)
 
-### 2. Create the database
+#### 2. Create the database
 
 ```bash
 createdb dataroom

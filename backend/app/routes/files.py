@@ -1,18 +1,21 @@
 """
 File management routes.
 
-GET    /files              — list files (optional ?folder_id=)
-GET    /files/<id>         — file metadata
-GET    /files/<id>/view    — serve file inline (for browser preview)
+POST   /files/upload        — upload a file from the browser (multipart/form-data)
+GET    /files/              — list files (optional ?folder_id=)
+GET    /files/<id>          — file metadata
+GET    /files/<id>/view     — serve file inline (for browser preview)
 GET    /files/<id>/download — serve file as attachment
-PATCH  /files/<id>         — rename or move (update name / folder_id)
-DELETE /files/<id>         — delete file from dataroom + disk
+PATCH  /files/<id>          — rename or move (update name / folder_id)
+DELETE /files/<id>          — delete file from dataroom + disk
 """
 from __future__ import annotations
 
 import os
+import uuid
 
 from flask import Blueprint, g, jsonify, request, send_file
+from werkzeug.utils import secure_filename
 
 from ..extensions import db
 from ..middleware import require_owner
@@ -20,6 +23,44 @@ from ..models.file import FileRecord
 from ..services import file_storage
 
 files_bp = Blueprint("files", __name__)
+
+
+@files_bp.post("/upload")
+@require_owner
+def upload_file():
+    """
+    Upload a file from the browser (multipart/form-data).
+    Form fields:
+      - file       (required) — the binary file
+      - folder_id  (optional) — target folder UUID
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    uploaded = request.files["file"]
+    if not uploaded.filename:
+        return jsonify({"error": "Empty filename"}), 400
+
+    folder_id = request.form.get("folder_id") or None
+    mime_type = uploaded.mimetype or "application/octet-stream"
+    filename = secure_filename(uploaded.filename)
+    content = uploaded.read()
+
+    record = FileRecord(
+        name=uploaded.filename,  # preserve original name for display
+        mime_type=mime_type,
+        size=len(content),
+        folder_id=folder_id,
+        owner_id=g.owner_id,
+    )
+    db.session.add(record)
+    db.session.flush()  # generate record.id
+
+    storage_path = file_storage.save_file(content, g.owner_id, record.id, filename)
+    record.storage_path = storage_path
+    db.session.commit()
+
+    return jsonify(record.to_dict()), 201
 
 
 @files_bp.get("/")

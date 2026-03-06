@@ -26,11 +26,13 @@ def create_app(env: str | None = None) -> Flask:
     from .routes.files import files_bp
     from .routes.folders import folders_bp
     from .routes.gdrive import gdrive_bp
+    from .routes.search import search_bp
 
     app.register_blueprint(oauth_bp, url_prefix="/oauth")
     app.register_blueprint(files_bp, url_prefix="/files")
     app.register_blueprint(folders_bp, url_prefix="/folders")
     app.register_blueprint(gdrive_bp, url_prefix="/gdrive")
+    app.register_blueprint(search_bp, url_prefix="/search")
 
     @app.get("/health")
     def health():

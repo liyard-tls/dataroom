@@ -2,6 +2,7 @@ import { storageConfig } from '@/config/storage.config'
 import { StorageAdapter } from './interface/storage.interface'
 import { IndexedDBAdapter } from './adapters/indexeddb.adapter'
 import { SupabaseAdapter } from './adapters/supabase.adapter'
+import { FlaskApiAdapter } from './adapters/flask-api.adapter'
 
 /** Returns the active storage adapter based on config/env */
 function createAdapter(): StorageAdapter {
@@ -10,6 +11,8 @@ function createAdapter(): StorageAdapter {
       return new IndexedDBAdapter()
     case 'supabase':
       return new SupabaseAdapter()
+    case 'flask':
+      return new FlaskApiAdapter()
     default:
       throw new Error(`Unknown storage adapter: ${storageConfig.adapter}`)
   }

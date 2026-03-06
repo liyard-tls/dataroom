@@ -3,10 +3,10 @@
  * To switch to a different backend, change NEXT_PUBLIC_STORAGE_ADAPTER in .env
  * and implement the corresponding adapter in modules/storage/adapters/.
  *
- * Supported values: 'indexeddb' | 'supabase'
+ * Supported values: 'indexeddb' | 'supabase' | 'flask'
  */
 
-export type StorageAdapterType = 'indexeddb' | 'supabase'
+export type StorageAdapterType = 'indexeddb' | 'supabase' | 'flask'
 
 export const storageConfig = {
   adapter: (process.env.NEXT_PUBLIC_STORAGE_ADAPTER ?? 'indexeddb') as StorageAdapterType,
