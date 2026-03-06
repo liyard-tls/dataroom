@@ -19,6 +19,7 @@ import { useFiles } from "@/modules/files/hooks/useFiles";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MainPanel } from "@/components/layout/MainPanel";
 import { ViewerModal } from "@/modules/viewer/components/ViewerModal";
+import { UploadProgressPanel } from "@/components/common/UploadProgressPanel";
 import { SearchBar } from "@/modules/search/components/SearchBar";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
@@ -116,6 +117,11 @@ function DataRoomApp() {
   useEffect(() => {
     void loadAllFiles();
   }, [loadAllFiles, folders]);
+
+  // Keep allFiles in sync when files in current folder change (uploads, deletes, renames)
+  useEffect(() => {
+    void loadAllFiles();
+  }, [loadAllFiles, files]);
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
 
@@ -380,6 +386,7 @@ function DataRoomApp() {
       </DragOverlay>
 
       <ViewerModal />
+      <UploadProgressPanel />
     </DndContext>
   );
 }

@@ -6,11 +6,20 @@ import { useUIStore } from '@/store/uiStore'
 import { useAuth } from '@/modules/auth'
 import { fileService } from '../services/file.service'
 import { toast } from 'sonner'
+import { useShallow } from 'zustand/react/shallow'
 
 export function useFiles(folderId: string | null) {
   const { user } = useAuth()
   const { files, selectedIds, sortField, sortDirection, isLoading, setFiles, addFile, updateFile, removeFile, removeFiles, setLoading, setError } = useFileStore()
-  const { openViewer } = useUIStore()
+  const { openViewer, startUpload, completeOneUpload, failOneUpload, finishUpload } = useUIStore(
+    useShallow((s) => ({
+      openViewer: s.openViewer,
+      startUpload: s.startUpload,
+      completeOneUpload: s.completeOneUpload,
+      failOneUpload: s.failOneUpload,
+      finishUpload: s.finishUpload,
+    }))
+  )
 
   const loadFiles = useCallback(async () => {
     setLoading(true)
@@ -27,20 +36,33 @@ export function useFiles(folderId: string | null) {
 
   const uploadFiles = useCallback(async (browserFiles: File[]) => {
     if (!user) return
+    startUpload(browserFiles.length)
+
     const results = await Promise.allSettled(
-      browserFiles.map((f) => fileService.uploadFile(f, folderId, user.uid))
+      browserFiles.map(async (f, i) => {
+        try {
+          const record = await fileService.uploadFile(f, folderId, user.uid)
+          completeOneUpload()
+          return { index: i, record }
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : `Failed to upload "${f.name}"`
+          failOneUpload(f.name, reason)
+          throw err
+        }
+      })
     )
 
     results.forEach((result, i) => {
       if (result.status === 'fulfilled') {
-        const { blob: _blob, ...metadata } = result.value
+        const { blob: _blob, ...metadata } = result.value.record
         addFile(metadata)
-        toast.success(`"${browserFiles[i].name}" uploaded`)
       } else {
-        toast.error(result.reason?.message ?? `Failed to upload "${browserFiles[i].name}"`)
+        void i // already tracked via failOneUpload
       }
     })
-  }, [user, folderId, addFile])
+
+    finishUpload()
+  }, [user, folderId, addFile, startUpload, completeOneUpload, failOneUpload, finishUpload])
 
   const renameFile = useCallback(async (id: string, name: string) => {
     try {

@@ -4,6 +4,16 @@ import { FileRecord } from '@/types/file.types'
 
 type Theme = 'light' | 'dark' | 'system'
 
+export interface UploadProgress {
+  // null = idle, 'uploading' = in progress, 'done' = finished, 'error' = has failures
+  status: 'uploading' | 'done' | 'error' | null
+  total: number
+  completed: number
+  startedAt: number | null
+  // Files that failed to upload
+  errors: { name: string; reason: string }[]
+}
+
 interface UIState {
   theme: Theme
   isSidebarCollapsed: boolean
@@ -13,6 +23,8 @@ interface UIState {
   searchQuery: string
   // Favorited file/folder IDs (persisted)
   favoriteIds: Set<string>
+  // Upload progress panel state
+  uploadProgress: UploadProgress
 
   setTheme: (theme: Theme) => void
   toggleSidebar: () => void
@@ -20,6 +32,11 @@ interface UIState {
   closeViewer: () => void
   setSearchQuery: (query: string) => void
   toggleFavorite: (id: string) => void
+  startUpload: (total: number) => void
+  completeOneUpload: () => void
+  failOneUpload: (name: string, reason: string) => void
+  finishUpload: () => void
+  dismissUpload: () => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -30,6 +47,7 @@ export const useUIStore = create<UIState>()(
       viewerFile: null,
       searchQuery: '',
       favoriteIds: new Set(),
+      uploadProgress: { status: null, total: 0, completed: 0, startedAt: null, errors: [] },
 
       setTheme: (theme) => set({ theme }),
       toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
@@ -43,6 +61,29 @@ export const useUIStore = create<UIState>()(
           else next.add(id)
           return { favoriteIds: next }
         }),
+      startUpload: (total) =>
+        set({ uploadProgress: { status: 'uploading', total, completed: 0, startedAt: Date.now(), errors: [] } }),
+      completeOneUpload: () =>
+        set((state) => ({
+          uploadProgress: { ...state.uploadProgress, completed: state.uploadProgress.completed + 1 },
+        })),
+      failOneUpload: (name, reason) =>
+        set((state) => ({
+          uploadProgress: {
+            ...state.uploadProgress,
+            completed: state.uploadProgress.completed + 1,
+            errors: [...state.uploadProgress.errors, { name, reason }],
+          },
+        })),
+      finishUpload: () =>
+        set((state) => ({
+          uploadProgress: {
+            ...state.uploadProgress,
+            status: state.uploadProgress.errors.length > 0 ? 'error' : 'done',
+          },
+        })),
+      dismissUpload: () =>
+        set({ uploadProgress: { status: null, total: 0, completed: 0, startedAt: null, errors: [] } }),
     }),
     {
       name: 'ui-storage',
