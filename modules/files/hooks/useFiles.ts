@@ -10,7 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 export function useFiles(folderId: string | null) {
   const { user } = useAuth()
-  const { files, selectedIds, sortField, sortDirection, isLoading, setFiles, addFile, updateFile, removeFile, removeFiles, setLoading, setError } = useFileStore()
+  const { files, selectedIds, isLoading, setFiles, addFile, updateFile, removeFile, removeFiles, setLoading, setError } = useFileStore()
   const { openViewer, startUpload, completeOneUpload, failOneUpload, finishUpload } = useUIStore(
     useShallow((s) => ({
       openViewer: s.openViewer,
@@ -126,21 +126,10 @@ export function useFiles(folderId: string | null) {
     }
   }, [selectedIds, user])
 
-  // Sort files in-memory based on current sort settings
-  const sortedFiles = [...files].sort((a, b) => {
-    let cmp = 0
-    if (sortField === 'name') cmp = a.name.localeCompare(b.name)
-    else if (sortField === 'size') cmp = a.size - b.size
-    else if (sortField === 'createdAt') cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    return sortDirection === 'asc' ? cmp : -cmp
-  })
-
   return {
-    files: sortedFiles,
+    files,
     selectedIds,
     isLoading,
-    sortField,
-    sortDirection,
     loadFiles,
     uploadFiles,
     renameFile,

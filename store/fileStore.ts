@@ -1,16 +1,11 @@
 import { create } from 'zustand'
 import { FileMetadata } from '@/types/file.types'
 
-export type SortField = 'name' | 'createdAt' | 'size'
-export type SortDirection = 'asc' | 'desc'
-
 interface FileState {
   // Files for the currently open folder (metadata only — no blobs)
   files: FileMetadata[]
   // IDs of selected files for bulk operations
   selectedIds: Set<string>
-  sortField: SortField
-  sortDirection: SortDirection
   isLoading: boolean
   error: string | null
 
@@ -22,7 +17,6 @@ interface FileState {
   toggleSelection: (id: string) => void
   selectAll: () => void
   clearSelection: () => void
-  setSorting: (field: SortField, direction: SortDirection) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
 }
@@ -30,8 +24,6 @@ interface FileState {
 export const useFileStore = create<FileState>()((set) => ({
   files: [],
   selectedIds: new Set(),
-  sortField: 'name',
-  sortDirection: 'asc',
   isLoading: false,
   error: null,
 
@@ -67,7 +59,6 @@ export const useFileStore = create<FileState>()((set) => ({
   selectAll: () =>
     set((state) => ({ selectedIds: new Set(state.files.map((f) => f.id)) })),
   clearSelection: () => set({ selectedIds: new Set() }),
-  setSorting: (sortField, sortDirection) => set({ sortField, sortDirection }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
 }))

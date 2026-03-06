@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 
 export function useFolders() {
   const { user } = useAuth()
-  const { folders, currentFolderId, isLoading, setFolders, addFolder, updateFolder, removeFolder, setCurrentFolderId, setLoading, setError } = useFolderStore()
+  const { folders, currentFolderId, isLoading, setFolders, addFolder, updateFolder, setCurrentFolderId, setLoading, setError } = useFolderStore()
 
   const loadFolders = useCallback(async () => {
     if (!user) return
@@ -48,11 +48,13 @@ export function useFolders() {
   const deleteFolder = useCallback(async (id: string) => {
     try {
       await folderService.deleteFolder(id)
-      removeFolder(id)
+      // Reload full tree — adapter cascades delete to all descendants,
+      // so syncing only the root node would leave orphaned children in the store.
+      await loadFolders()
     } catch {
       toast.error('Failed to delete folder')
     }
-  }, [removeFolder])
+  }, [loadFolders])
 
   const moveFolder = useCallback(async (id: string, newParentId: string | null) => {
     const folder = folders.find((f) => f.id === id)
