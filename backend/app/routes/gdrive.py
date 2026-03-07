@@ -1,8 +1,10 @@
 """
-Google Drive browsing and import routes.
+Google Drive import route.
 
-GET  /gdrive/files          — list files in the user's Google Drive
-POST /gdrive/import         — import selected files into the dataroom
+POST /gdrive/import — download selected files (chosen via Google Picker) into the dataroom.
+
+The frontend passes a short-lived Google OAuth access_token obtained directly
+from the Picker API, so no server-side token storage is needed.
 """
 from __future__ import annotations
 
@@ -11,32 +13,9 @@ from flask import Blueprint, g, jsonify, request
 from ..extensions import db
 from ..middleware import require_owner
 from ..models.file import FileRecord
-from ..services import google_drive, file_storage, token_service
+from ..services import google_drive, file_storage
 
 gdrive_bp = Blueprint("gdrive", __name__)
-
-
-@gdrive_bp.get("/files")
-@require_owner
-def list_gdrive_files():
-    """
-    List files available in the user's Google Drive.
-    Query params:
-      - pageToken (optional) — for pagination
-      - pageSize  (optional, default 50)
-    """
-    try:
-        page_token = request.args.get("pageToken")
-        page_size = min(int(request.args.get("pageSize", 50)), 100)
-        result = google_drive.list_files(g.owner_id, page_token=page_token, page_size=page_size)
-        return jsonify(result)
-    except ValueError as e:
-        err = str(e)
-        if err in ("gdrive_not_connected", "gdrive_reauth_required"):
-            return jsonify({"error": err}), 401
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 502
 
 
 @gdrive_bp.post("/import")
@@ -47,6 +26,7 @@ def import_files():
 
     Request body:
     {
+      "accessToken": "<google oauth access token from Picker>",
       "fileIds": ["gdrive_file_id_1", ...],
       "folderId": "target_folder_id or null"
     }
@@ -58,9 +38,12 @@ def import_files():
     }
     """
     body = request.get_json(silent=True) or {}
+    access_token: str = body.get("accessToken", "")
     gdrive_ids: list[str] = body.get("fileIds", [])
     folder_id: str | None = body.get("folderId") or None
 
+    if not access_token:
+        return jsonify({"error": "accessToken is required"}), 400
     if not gdrive_ids:
         return jsonify({"error": "fileIds is required"}), 400
 
@@ -77,9 +60,8 @@ def import_files():
                 imported.append(existing.to_dict())
                 continue
 
-            content, filename, mime_type = google_drive.download_file(g.owner_id, gdrive_id)
+            content, filename, mime_type = google_drive.download_file(access_token, gdrive_id)
 
-            # Build the FileRecord first to get the id for the storage path
             record = FileRecord(
                 name=filename,
                 mime_type=mime_type,
@@ -89,21 +71,14 @@ def import_files():
                 gdrive_file_id=gdrive_id,
             )
             db.session.add(record)
-            db.session.flush()  # generates record.id without committing
+            db.session.flush()
 
-            # Save file to disk
             storage_path = file_storage.save_file(content, g.owner_id, record.id, filename)
             record.storage_path = storage_path
 
             db.session.commit()
             imported.append(record.to_dict())
 
-        except ValueError as e:
-            err = str(e)
-            if err in ("gdrive_not_connected", "gdrive_reauth_required"):
-                return jsonify({"error": err}), 401
-            errors.append({"fileId": gdrive_id, "error": err})
-            db.session.rollback()
         except Exception as e:
             errors.append({"fileId": gdrive_id, "error": str(e)})
             db.session.rollback()

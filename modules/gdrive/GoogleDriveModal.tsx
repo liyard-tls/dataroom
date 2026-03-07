@@ -1,11 +1,23 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { HardDriveDownload, X, RefreshCw, ExternalLink, Check, AlertCircle } from 'lucide-react'
-import { gdriveService, GDriveFile, GDriveStatus } from './gdrive.service'
+/**
+ * GoogleDriveModal — opens the native Google Picker UI.
+ *
+ * Flow:
+ *  1. Load gapi + picker scripts
+ *  2. Authenticate via google.accounts.oauth2.initTokenClient (popup)
+ *  3. Open Google Picker — user selects files
+ *  4. POST selected file IDs + access_token to backend for download
+ *
+ * Required env vars (public):
+ *   NEXT_PUBLIC_GOOGLE_CLIENT_ID  — OAuth 2.0 client ID
+ *   NEXT_PUBLIC_GOOGLE_API_KEY    — API key (for Picker)
+ */
+
+import { useEffect, useRef, useState } from 'react'
+import { HardDriveDownload, X, Check, AlertCircle } from 'lucide-react'
+import { gdriveService } from './gdrive.service'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { formatFileSize } from '@/lib/fileHelpers'
 
 interface GoogleDriveModalProps {
   currentFolderId: string | null
@@ -13,96 +25,115 @@ interface GoogleDriveModalProps {
   onClose: () => void
 }
 
-function fileSize(bytes?: number) {
-  if (!bytes) return ''
-  return formatFileSize(bytes)
+const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''
+const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY ?? ''
+const SCOPES = 'https://www.googleapis.com/auth/drive.readonly'
+const PICKER_APP_ID = CLIENT_ID.split('-')[0] // numeric project ID
+
+declare global {
+  interface Window {
+    gapi: any
+    google: any
+  }
 }
 
 export function GoogleDriveModal({ currentFolderId, onImported, onClose }: GoogleDriveModalProps) {
-  const [status, setStatus] = useState<GDriveStatus | null>(null)
-  const [files, setFiles] = useState<GDriveFile[]>([])
-  const [nextPageToken, setNextPageToken] = useState<string | undefined>()
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [loadingFiles, setLoadingFiles] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [importResult, setImportResult] = useState<{ imported: number; errors: number } | null>(null)
-  const oauthWindowRef = useRef<Window | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const tokenClientRef = useRef<any>(null)
+  const accessTokenRef = useRef<string>('')
+  const pickerInited = useRef(false)
+  const gapiInited = useRef(false)
 
-  // Load connection status on open
   useEffect(() => {
-    gdriveService.getStatus()
-      .then(setStatus)
-      .catch(() => setStatus({ connected: false }))
+    loadScripts()
   }, [])
 
-  // When connected, load files
-  useEffect(() => {
-    if (status?.connected) loadFiles()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status?.connected])
+  function loadScripts() {
+    // Load gapi
+    if (!document.getElementById('gapi-script')) {
+      const s = document.createElement('script')
+      s.id = 'gapi-script'
+      s.src = 'https://apis.google.com/js/api.js'
+      s.onload = () => window.gapi.load('picker', () => { gapiInited.current = true })
+      document.body.appendChild(s)
+    } else if (window.gapi) {
+      window.gapi.load('picker', () => { gapiInited.current = true })
+    }
 
-  // Poll for OAuth callback (popup closes after redirect to ?gdrive_connected=true)
-  useEffect(() => {
-    if (!oauthWindowRef.current) return
-    const interval = setInterval(() => {
-      try {
-        if (oauthWindowRef.current?.closed) {
-          clearInterval(interval)
-          oauthWindowRef.current = null
-          // Re-check status
-          gdriveService.getStatus().then(setStatus).catch(() => {})
+    // Load GIS (Google Identity Services)
+    if (!document.getElementById('gis-script')) {
+      const s = document.createElement('script')
+      s.id = 'gis-script'
+      s.src = 'https://accounts.google.com/gsi/client'
+      s.onload = initTokenClient
+      document.body.appendChild(s)
+    } else if (window.google?.accounts) {
+      initTokenClient()
+    }
+  }
+
+  function initTokenClient() {
+    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (resp: any) => {
+        if (resp.error) {
+          setError(resp.error)
+          return
         }
-      } catch {
-        // cross-origin access throws before redirect completes — ignore
-      }
-    }, 500)
-    return () => clearInterval(interval)
-  }, [oauthWindowRef.current]) // eslint-disable-line react-hooks/exhaustive-deps
+        accessTokenRef.current = resp.access_token
+        openPicker(resp.access_token)
+      },
+    })
+    pickerInited.current = true
+  }
 
-  async function loadFiles(pageToken?: string) {
-    setLoadingFiles(true)
-    setError(null)
-    try {
-      const result = await gdriveService.listFiles(pageToken)
-      setFiles(prev => pageToken ? [...prev, ...result.files] : result.files)
-      setNextPageToken(result.nextPageToken)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load files')
-    } finally {
-      setLoadingFiles(false)
+  function openPicker(token: string) {
+    if (!window.gapi?.picker) {
+      setError('Google Picker not loaded yet, try again')
+      return
     }
+    const picker = new window.google.picker.PickerBuilder()
+      .addView(
+        new window.google.picker.View(window.google.picker.ViewId.DOCS)
+          .setMimeTypes([
+            'application/pdf',
+            'image/*',
+            'video/*',
+            'text/plain',
+            'text/markdown',
+            'application/json',
+            'application/zip',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ].join(','))
+      )
+      .setOAuthToken(token)
+      .setDeveloperKey(API_KEY)
+      .setAppId(PICKER_APP_ID)
+      .setTitle('Select files to import')
+      .enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED)
+      .setCallback((data: any) => handlePickerCallback(data, token))
+      .build()
+    picker.setVisible(true)
   }
 
-  async function handleConnect() {
-    try {
-      const { authUrl } = await gdriveService.getAuthUrl()
-      oauthWindowRef.current = window.open(authUrl, '_blank', 'width=600,height=700')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to get auth URL')
-    }
-  }
+  async function handlePickerCallback(data: any, token: string) {
+    if (data.action !== window.google.picker.Action.PICKED) return
+    const fileIds: string[] = data.docs.map((d: any) => d.id)
+    if (fileIds.length === 0) return
 
-  async function handleDisconnect() {
-    await gdriveService.revoke().catch(() => {})
-    setStatus({ connected: false })
-    setFiles([])
-    setSelectedIds(new Set())
-  }
-
-  async function handleImport() {
-    if (selectedIds.size === 0) return
     setImporting(true)
     setError(null)
     try {
-      const result = await gdriveService.importFiles([...selectedIds], currentFolderId)
+      const result = await gdriveService.importFiles(token, fileIds, currentFolderId)
       setImportResult({ imported: result.imported.length, errors: result.errors.length })
-      if (result.errors.length === 0) {
-        onImported()
-        setTimeout(onClose, 1500)
-      } else {
-        onImported()
-      }
+      onImported()
+      if (result.errors.length === 0) setTimeout(onClose, 1500)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Import failed')
     } finally {
@@ -110,18 +141,26 @@ export function GoogleDriveModal({ currentFolderId, onImported, onClose }: Googl
     }
   }
 
-  function toggleSelect(id: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+  function handleOpen() {
+    if (!CLIENT_ID || !API_KEY) {
+      setError('NEXT_PUBLIC_GOOGLE_CLIENT_ID and NEXT_PUBLIC_GOOGLE_API_KEY must be set')
+      return
+    }
+    setError(null)
+    setImportResult(null)
+    if (accessTokenRef.current) {
+      openPicker(accessTokenRef.current)
+    } else if (tokenClientRef.current) {
+      tokenClientRef.current.requestAccessToken()
+    } else {
+      setError('Google scripts not loaded yet, try again')
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="relative flex h-[560px] w-[520px] flex-col rounded-xl border border-border bg-background shadow-2xl"
+        className="relative flex w-[420px] flex-col rounded-xl border border-border bg-background shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -129,144 +168,39 @@ export function GoogleDriveModal({ currentFolderId, onImported, onClose }: Googl
           <HardDriveDownload size={18} className="text-primary" />
           <span className="font-medium">Import from Google Drive</span>
           <div className="flex-1" />
-          {status?.connected && (
-            <button
-              onClick={handleDisconnect}
-              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-            >
-              Disconnect
-            </button>
-          )}
           <button onClick={onClose} className="rounded p-1 hover:bg-accent">
             <X size={15} />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex flex-1 flex-col overflow-hidden p-5">
-          {/* Not connected */}
-          {status && !status.connected && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-              <HardDriveDownload size={40} className="text-muted-foreground/30" />
-              <div>
-                <p className="font-medium">Connect Google Drive</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Authorize access to import files directly from your Drive.
-                </p>
-              </div>
-              <Button onClick={handleConnect} className="gap-2">
-                <ExternalLink size={14} />
-                Connect Google Drive
-              </Button>
-              {error && <p className="text-xs text-destructive">{error}</p>}
+        <div className="flex flex-col gap-4 p-5">
+          <p className="text-sm text-muted-foreground">
+            Click the button below to open the Google Drive file picker and select files to import.
+          </p>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AlertCircle size={13} />
+              {error}
             </div>
           )}
 
-          {/* Loading status */}
-          {!status && (
-            <div className="flex flex-1 items-center justify-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          {importResult && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-primary">
+              <Check size={13} />
+              Imported {importResult.imported} file{importResult.imported !== 1 ? 's' : ''}
+              {importResult.errors > 0 && `, ${importResult.errors} failed`}
             </div>
           )}
 
-          {/* Connected — file list */}
-          {status?.connected && (
-            <>
-              {status.email && (
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Connected as <span className="text-foreground">{status.email}</span>
-                </p>
-              )}
-
-              {error && (
-                <div className="mb-3 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  <AlertCircle size={13} />
-                  {error}
-                </div>
-              )}
-
-              {importResult && (
-                <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-primary">
-                  <Check size={13} />
-                  Imported {importResult.imported} file{importResult.imported !== 1 ? 's' : ''}
-                  {importResult.errors > 0 && `, ${importResult.errors} failed`}
-                </div>
-              )}
-
-              <div className="flex-1 overflow-y-auto">
-                {loadingFiles && files.length === 0 && (
-                  <div className="flex h-32 items-center justify-center">
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  </div>
-                )}
-                {!loadingFiles && files.length === 0 && (
-                  <p className="py-8 text-center text-sm text-muted-foreground">No files found in your Drive.</p>
-                )}
-                {files.map(file => (
-                  <div
-                    key={file.id}
-                    onClick={() => toggleSelect(file.id)}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent",
-                      selectedIds.has(file.id) && "bg-primary/10 hover:bg-primary/15"
-                    )}
-                  >
-                    <div className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                      selectedIds.has(file.id) ? "border-primary bg-primary" : "border-border"
-                    )}>
-                      {selectedIds.has(file.id) && <Check size={10} className="text-primary-foreground" />}
-                    </div>
-                    {file.iconLink && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={file.iconLink} alt="" className="h-4 w-4 shrink-0" />
-                    )}
-                    <span className="flex-1 truncate text-sm">{file.name}</span>
-                    {file.size != null && (
-                      <span className="shrink-0 text-xs text-muted-foreground">{fileSize(file.size)}</span>
-                    )}
-                  </div>
-                ))}
-
-                {nextPageToken && (
-                  <button
-                    onClick={() => loadFiles(nextPageToken)}
-                    disabled={loadingFiles}
-                    className="mt-2 w-full rounded-lg border border-dashed py-2 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
-                  >
-                    {loadingFiles ? 'Loading…' : 'Load more'}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+          <Button onClick={handleOpen} disabled={importing} className="gap-2">
+            {importing
+              ? <><div className="h-3.5 w-3.5 animate-spin rounded-full border border-primary-foreground border-t-transparent" /> Importing…</>
+              : <><HardDriveDownload size={14} /> Open Google Drive</>
+            }
+          </Button>
         </div>
-
-        {/* Footer */}
-        {status?.connected && (
-          <div className="flex items-center justify-between border-t px-5 py-3">
-            <span className="text-xs text-muted-foreground">
-              {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select files to import'}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => loadFiles()} disabled={loadingFiles} className="gap-1.5">
-                <RefreshCw size={13} className={cn(loadingFiles && "animate-spin")} />
-                Refresh
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleImport}
-                disabled={selectedIds.size === 0 || importing}
-                className="gap-1.5"
-              >
-                {importing
-                  ? <><div className="h-3 w-3 animate-spin rounded-full border border-primary-foreground border-t-transparent" /> Importing…</>
-                  : <><HardDriveDownload size={13} /> Import</>
-                }
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

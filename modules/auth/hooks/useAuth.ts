@@ -19,7 +19,6 @@ export function useAuthListener() {
       }
       const { setGDriveOwnerId } = await import('@/modules/gdrive/gdrive.service')
       setGDriveOwnerId(user?.uid ?? '')
-
       setUser(user)
       setLoading(false)
     })

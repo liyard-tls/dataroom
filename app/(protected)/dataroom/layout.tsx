@@ -66,13 +66,6 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Close popup window if this is an OAuth callback (?gdrive_connected=true)
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.opener && window.location.search.includes("gdrive_connected=true")) {
-      window.close()
-    }
-  }, [])
-
   // Derive path segments from pathname instead of useParams (layout doesn't get [[...path]] params)
   const pathSegments = pathname
     .replace(/^\/dataroom\/?/, "")
