@@ -19,6 +19,7 @@ import { AuthGuard } from "@/modules/auth";
 import { useFolders } from "@/modules/folders/hooks/useFolders";
 import { useFiles } from "@/modules/files/hooks/useFiles";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { GoogleDriveModal } from "@/modules/gdrive/GoogleDriveModal";
 import { MainPanel } from "@/components/layout/MainPanel";
 import { ViewerModal } from "@/modules/viewer/components/ViewerModal";
 import { UploadProgressPanel } from "@/components/common/UploadProgressPanel";
@@ -65,6 +66,13 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Close popup window if this is an OAuth callback (?gdrive_connected=true)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.opener && window.location.search.includes("gdrive_connected=true")) {
+      window.close()
+    }
+  }, [])
+
   // Derive path segments from pathname instead of useParams (layout doesn't get [[...path]] params)
   const pathSegments = pathname
     .replace(/^\/dataroom\/?/, "")
@@ -82,6 +90,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   } = useUIStore();
   const user = useAuthStore((state) => state.user);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [driveModalOpen, setDriveModalOpen] = useState(false);
   const [sortField, setSortField] = useState<"name" | "size" | "updatedAt">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterTypes, setFilterTypes] = useState<Set<FileType | "folder">>(new Set());
@@ -332,6 +341,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
             isDragging={activeDragId !== null}
             favoriteIds={favoriteIds}
             activeFileId={viewerFile?.id ?? null}
+            onImportFromDrive={() => setDriveModalOpen(true)}
           />
         </div>
 
@@ -495,6 +505,13 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
 
       <ViewerModal />
       <UploadProgressPanel />
+      {driveModalOpen && (
+        <GoogleDriveModal
+          currentFolderId={currentFolderId}
+          onImported={() => { invalidateFolderCache(currentFolderId); void loadAllFiles(); }}
+          onClose={() => setDriveModalOpen(false)}
+        />
+      )}
     </DndContext>
   );
 }

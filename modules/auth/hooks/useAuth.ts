@@ -17,6 +17,8 @@ export function useAuthListener() {
         const { setOwnerId } = await import('@/modules/storage/adapters/flask-api.adapter')
         setOwnerId(user?.uid ?? '')
       }
+      const { setGDriveOwnerId } = await import('@/modules/gdrive/gdrive.service')
+      setGDriveOwnerId(user?.uid ?? '')
 
       setUser(user)
       setLoading(false)

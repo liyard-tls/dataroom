@@ -11,6 +11,7 @@ import {
   X,
   LogOut,
   Upload,
+  HardDriveDownload,
 } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,6 +39,7 @@ interface SidebarProps {
   isDragging?: boolean;
   favoriteIds: Set<string>;
   activeFileId?: string | null;
+  onImportFromDrive?: () => void;
 }
 
 interface FolderNodeProps {
@@ -417,6 +419,7 @@ export function Sidebar({
   isDragging = false,
   favoriteIds,
   activeFileId = null,
+  onImportFromDrive,
 }: SidebarProps) {
   const [isCreatingRoot, setIsCreatingRoot] = useState(false);
   const [rootName, setRootName] = useState("");
@@ -543,6 +546,17 @@ export function Sidebar({
               <Upload size={15} className="mr-2" />
               Upload files
             </Button>
+            {onImportFromDrive && (
+              <Button
+                variant="outline"
+                className="h-10 w-full justify-start rounded-lg px-3 backdrop-blur-md"
+                onClick={onImportFromDrive}
+                title="Import from Google Drive"
+              >
+                <HardDriveDownload size={15} className="mr-2" />
+                Import from Drive
+              </Button>
+            )}
           </div>
         </div>
 
