@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import {
@@ -117,7 +118,10 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     setViewMode,
   } = useUIStore();
   const user = useAuthStore((state) => state.user);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [creatingFolderId, setCreatingFolderId] = useState<string | null>(null);
   const [driveModalOpen, setDriveModalOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<{
     type: "file" | "folder";
@@ -264,7 +268,9 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
         .filter((f) => f.parentId === parentId)
         .map((f) => f.name);
       const resolvedName = uniqueName(name, siblings);
-      return createFolder(resolvedName, parentId);
+      const folder = await createFolder(resolvedName, parentId);
+      if (folder) setCreatingFolderId(folder.id);
+      return folder;
     },
     [createFolder, folders],
   );
@@ -283,6 +289,11 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     await deleteSelected();
     void loadAllFiles();
   }, [deleteSelected, loadAllFiles, currentFolderId]);
+
+  const navigateUp = useCallback(() => {
+    const current = folders.find((f) => f.id === currentFolderId);
+    navigate(current?.parentId ?? null);
+  }, [folders, currentFolderId, navigate]);
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
 
@@ -325,6 +336,15 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [folders, currentFolderId, sortField, sortDir, filterTypes]);
+
+  useGlobalHotkeys({
+    onUpload: () => uploadInputRef.current?.click(),
+    onCreateFolder: () => void handleCreateFolder("New Folder", currentFolderId),
+    onDeleteSelected: handleDeleteSelected,
+    onSelectAll: () => selectAll(displayedFolders.map((f) => f.id)),
+    onNavigateUp: navigateUp,
+    searchInputRef,
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -729,7 +749,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                 <LayoutGrid size={14} />
               </Button>
             </div>
-            <SearchBar />
+            <SearchBar ref={searchInputRef} />
             <ThemeToggle />
           </header>
 
@@ -751,7 +771,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               onDeleteSelected={handleDeleteSelected}
               onUpload={handleUploadFiles}
               onFolderOpen={navigate}
-              onFolderRename={renameFolder}
+              onFolderRename={(id, name) => renameFolder(id, name)}
               onFolderDelete={async (id) => {
                 invalidateAllFolderCache();
                 await deleteFolder(id);
@@ -767,6 +787,8 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                 const file = allFiles.find((f) => f.id === id);
                 if (file) setShareTarget({ type: "file", id, name: file.name });
               }}
+              creatingFolderId={creatingFolderId}
+              onCreatingFolderEnd={() => setCreatingFolderId(null)}
               onShareFolder={(id) => {
                 const folder = folders.find((f) => f.id === id);
                 if (folder)
@@ -794,6 +816,20 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
           </div>
         )}
       </DragOverlay>
+
+      {/* Hidden upload input for Ctrl+U hotkey */}
+      <input
+        ref={uploadInputRef}
+        type="file"
+        multiple
+        className="sr-only"
+        onChange={(e) => {
+          if (e.target.files?.length) {
+            void handleUploadFiles(Array.from(e.target.files));
+            e.target.value = "";
+          }
+        }}
+      />
 
       <ViewerModal />
       <UploadProgressPanel />

@@ -1,5 +1,6 @@
 'use client'
 
+import { forwardRef } from 'react'
 import { Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { useUIStore } from '@/store/uiStore'
@@ -8,7 +9,7 @@ import { useFolderStore } from '@/store/folderStore'
 import { FileIcon } from '@/components/common/FileIcon'
 import { AnimatePresence, motion } from 'framer-motion'
 
-export function SearchBar() {
+export const SearchBar = forwardRef<HTMLInputElement, object>(function SearchBar(_, ref) {
   const { searchQuery, setSearchQuery } = useUIStore()
   const { setCurrentFolderId } = useFolderStore()
   const { results, isLoading } = useSearch(searchQuery)
@@ -17,7 +18,6 @@ export function SearchBar() {
 
   function handleResultClick(folderId: string | null, type: 'file' | 'folder') {
     if (type === 'folder') {
-      // Navigate to the folder's parent, then open the folder
       setCurrentFolderId(folderId)
     } else {
       setCurrentFolderId(folderId)
@@ -34,6 +34,7 @@ export function SearchBar() {
           <Search size={15} className="absolute left-2.5 text-muted-foreground" />
         )}
         <Input
+          ref={ref}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search files and folders..."
@@ -81,4 +82,4 @@ export function SearchBar() {
       </AnimatePresence>
     </div>
   )
-}
+})

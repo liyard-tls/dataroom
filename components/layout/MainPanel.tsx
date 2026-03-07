@@ -56,6 +56,8 @@ interface MainPanelProps {
   viewMode: "list" | "grid";
   onShareFile: (id: string) => void;
   onShareFolder: (id: string) => void;
+  creatingFolderId?: string | null;
+  onCreatingFolderEnd?: () => void;
 }
 
 // Shared column widths — identical in header and every row
@@ -97,9 +99,11 @@ function FolderRow({
   isNotEmpty,
   isSelected,
   isFavorite,
+  startRenaming: startRenamingProp,
   onSelect,
   onOpen,
   onRename,
+  onRenameEnd,
   onDelete,
   onToggleFavorite,
   onShare,
@@ -108,16 +112,23 @@ function FolderRow({
   isNotEmpty: boolean;
   isSelected: boolean;
   isFavorite: boolean;
+  startRenaming?: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onRename: (name: string) => void;
+  onRenameEnd?: () => void;
   onDelete: () => void;
   onToggleFavorite: () => void;
   onShare: () => void;
 }) {
-  const [isRenaming, setIsRenaming] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(startRenamingProp ?? false);
   const [nameValue, setNameValue] = useState(folder.name);
   const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // If parent marks this folder as newly created, enter rename mode
+  useEffect(() => {
+    if (startRenamingProp) setIsRenaming(true);
+  }, [startRenamingProp]);
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `main-folder-${folder.id}` });
   const { setNodeRef: setDragRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `main-${folder.id}` });
@@ -137,6 +148,7 @@ function FolderRow({
     const trimmed = nameValue.trim();
     if (trimmed && trimmed !== folder.name) onRename(trimmed);
     setIsRenaming(false);
+    onRenameEnd?.();
   }
 
   return (
@@ -192,6 +204,7 @@ function FolderRow({
               if (e.key === "Escape") {
                 setIsRenaming(false);
                 setNameValue(folder.name);
+                onRenameEnd?.();
               }
             }}
             className="flex-1 rounded border border-primary bg-background px-1 text-sm outline-none"
@@ -434,10 +447,12 @@ function FolderCard({
   isNotEmpty,
   isSelected,
   isFavorite,
+  startRenaming: startRenamingProp,
   onSelect,
   onOpen,
   onRename,
   onDelete,
+  onRenameEnd,
   onToggleFavorite,
   onShare,
 }: {
@@ -445,16 +460,23 @@ function FolderCard({
   isNotEmpty: boolean;
   isSelected: boolean;
   isFavorite: boolean;
+  startRenaming?: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onRename: (name: string) => void;
+  onRenameEnd?: () => void;
   onDelete: () => void;
   onToggleFavorite: () => void;
   onShare: () => void;
 }) {
-  const [isRenaming, setIsRenaming] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(startRenamingProp ?? false);
   const [nameValue, setNameValue] = useState(folder.name);
   const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // If parent marks this folder as newly created, enter rename mode
+  useEffect(() => {
+    if (startRenamingProp) setIsRenaming(true);
+  }, [startRenamingProp]);
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `main-folder-${folder.id}` });
   const { setNodeRef: setDragRef, attributes, listeners, transform, isDragging } = useDraggable({ id: `main-${folder.id}` });
@@ -473,6 +495,7 @@ function FolderCard({
     const trimmed = nameValue.trim();
     if (trimmed && trimmed !== folder.name) onRename(trimmed);
     setIsRenaming(false);
+    onRenameEnd?.();
   }
 
   return (
@@ -559,7 +582,7 @@ function FolderCard({
             onBlur={handleRenameSubmit}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleRenameSubmit();
-              if (e.key === "Escape") { setIsRenaming(false); setNameValue(folder.name); }
+              if (e.key === "Escape") { setIsRenaming(false); setNameValue(folder.name); onRenameEnd?.(); }
             }}
             className="w-full rounded border border-primary bg-background px-1 text-xs outline-none"
             onPointerDown={(e) => e.stopPropagation()}
@@ -731,6 +754,8 @@ export function MainPanel({
   childFolders,
   onShareFile,
   onShareFolder,
+  creatingFolderId,
+  onCreatingFolderEnd,
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -915,9 +940,11 @@ export function MainPanel({
                 }
                 isSelected={selectedIds.has(folder.id)}
                 isFavorite={favoriteIds.has(folder.id)}
+                startRenaming={creatingFolderId === folder.id}
                 onSelect={() => onToggleSelect(folder.id)}
                 onOpen={() => onFolderOpen(folder.id)}
                 onRename={(name) => onFolderRename(folder.id, name)}
+                onRenameEnd={onCreatingFolderEnd}
                 onDelete={() => onFolderDelete(folder.id)}
                 onToggleFavorite={() => onToggleFavorite(folder.id)}
                 onShare={() => onShareFolder(folder.id)}
@@ -952,9 +979,11 @@ export function MainPanel({
                 }
                 isSelected={selectedIds.has(folder.id)}
                 isFavorite={favoriteIds.has(folder.id)}
+                startRenaming={creatingFolderId === folder.id}
                 onSelect={() => onToggleSelect(folder.id)}
                 onOpen={() => onFolderOpen(folder.id)}
                 onRename={(name) => onFolderRename(folder.id, name)}
+                onRenameEnd={onCreatingFolderEnd}
                 onDelete={() => onFolderDelete(folder.id)}
                 onToggleFavorite={() => onToggleFavorite(folder.id)}
                 onShare={() => onShareFolder(folder.id)}

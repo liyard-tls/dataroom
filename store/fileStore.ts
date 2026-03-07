@@ -20,7 +20,7 @@ interface FileState {
   removeFile: (id: string) => void
   removeFiles: (ids: string[]) => void
   toggleSelection: (id: string) => void
-  selectAll: () => void
+  selectAll: (extraIds?: string[]) => void
   clearSelection: () => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
@@ -69,8 +69,8 @@ export const useFileStore = create<FileState>()((set) => ({
       }
       return { selectedIds }
     }),
-  selectAll: () =>
-    set((state) => ({ selectedIds: new Set(state.files.map((f) => f.id)) })),
+  selectAll: (extraIds = []) =>
+    set((state) => ({ selectedIds: new Set([...state.files.map((f) => f.id), ...extraIds]) })),
   clearSelection: () => set({ selectedIds: new Set() }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
