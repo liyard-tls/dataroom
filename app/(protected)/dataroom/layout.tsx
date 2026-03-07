@@ -508,7 +508,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
       {driveModalOpen && (
         <GoogleDriveModal
           currentFolderId={currentFolderId}
-          onImported={() => { invalidateFolderCache(currentFolderId); void loadAllFiles(); }}
+          onImported={() => { invalidateFolderCache(currentFolderId); void loadFiles(); void loadAllFiles(); }}
           onClose={() => setDriveModalOpen(false)}
         />
       )}

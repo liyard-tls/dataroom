@@ -47,8 +47,15 @@ export interface GDriveFile {
   iconLink?: string
 }
 
+export interface GDriveFolder {
+  id: string
+  name: string
+  iconLink?: string
+}
+
 export interface GDriveListResult {
   files: GDriveFile[]
+  folders: GDriveFolder[]
   nextPageToken?: string
 }
 
@@ -70,9 +77,18 @@ export const gdriveService = {
     await apiFetch('/oauth/google-drive/revoke', { method: 'DELETE' })
   },
 
-  async listFiles(pageToken?: string): Promise<GDriveListResult> {
+  async listItems(
+    driveFolderId: string | null,
+    typeFilter: string,
+    nameQuery?: string,
+    pageToken?: string,
+  ): Promise<GDriveListResult> {
     const params = new URLSearchParams({ pageSize: '50' })
     if (pageToken) params.set('pageToken', pageToken)
+    const isGlobalSearch = !!(typeFilter || nameQuery)
+    if (driveFolderId && !isGlobalSearch) params.set('folderId', driveFolderId)
+    if (typeFilter) params.set('typeFilter', typeFilter)
+    if (nameQuery) params.set('nameQuery', nameQuery)
     return apiFetch(`/gdrive/files?${params}`)
   },
 

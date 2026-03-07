@@ -20,15 +20,26 @@ gdrive_bp = Blueprint("gdrive", __name__)
 @require_owner
 def list_gdrive_files():
     """
-    List files available in the user's Google Drive.
+    List folders and files in a Drive folder.
     Query params:
-      - pageToken (optional) — for pagination
+      - folderId  (optional) — Drive folder ID; omit for root
+      - pageToken (optional) — pagination token for files
       - pageSize  (optional, default 50)
     """
     try:
+        folder_id = request.args.get("folderId") or None
+        type_filter = request.args.get("typeFilter") or None
+        name_query = request.args.get("nameQuery") or None
         page_token = request.args.get("pageToken")
         page_size = min(int(request.args.get("pageSize", 50)), 100)
-        result = google_drive.list_files(g.owner_id, page_token=page_token, page_size=page_size)
+        result = google_drive.list_items(
+            g.owner_id,
+            folder_id=folder_id,
+            type_filter=type_filter,
+            name_query=name_query,
+            page_token=page_token,
+            page_size=page_size,
+        )
         return jsonify(result)
     except ValueError as e:
         err = str(e)
