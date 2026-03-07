@@ -98,6 +98,7 @@ function FolderRow({
   folder,
   isNotEmpty,
   isSelected,
+  isFocused,
   isFavorite,
   startRenaming: startRenamingProp,
   onSelect,
@@ -111,6 +112,7 @@ function FolderRow({
   folder: Folder;
   isNotEmpty: boolean;
   isSelected: boolean;
+  isFocused?: boolean;
   isFavorite: boolean;
   startRenaming?: boolean;
   onSelect: () => void;
@@ -163,6 +165,7 @@ function FolderRow({
         "group flex items-center gap-3 rounded-lg py-2 transition-colors",
         ROW_PX,
         isSelected ? "bg-primary/10" : "hover:bg-accent",
+        isFocused && !isSelected && "ring-1 ring-inset ring-primary/50",
         isOver && !isDragging && "bg-primary/15 ring-1 ring-inset ring-primary/30",
       )}
       onDoubleClick={onOpen}
@@ -215,6 +218,7 @@ function FolderRow({
           <span className="truncate text-sm">{folder.name}</span>
         )}
         <button
+          tabIndex={-1}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
           onPointerDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
@@ -239,6 +243,7 @@ function FolderRow({
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
+              tabIndex={-1}
               variant="ghost"
               size="icon"
               className="h-7 w-7"
@@ -285,6 +290,7 @@ function FolderRow({
 function FileRow({
   file,
   isSelected,
+  isFocused,
   isFavorite,
   onSelect,
   onOpen,
@@ -295,6 +301,7 @@ function FileRow({
 }: {
   file: FileMetadata;
   isSelected: boolean;
+  isFocused?: boolean;
   isFavorite: boolean;
   onSelect: () => void;
   onOpen: () => void;
@@ -325,6 +332,7 @@ function FileRow({
         "group flex items-center gap-3 rounded-lg py-2 transition-colors",
         ROW_PX,
         isSelected ? "bg-primary/10" : "hover:bg-accent",
+        isFocused && !isSelected && "ring-1 ring-inset ring-primary/50",
       )}
       onDoubleClick={onOpen}
     >
@@ -372,6 +380,7 @@ function FileRow({
           <span className="truncate text-sm">{file.name}</span>
         )}
         <button
+          tabIndex={-1}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
           onPointerDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
@@ -399,6 +408,7 @@ function FileRow({
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
+              tabIndex={-1}
               variant="ghost"
               size="icon"
               className="h-7 w-7"
@@ -446,6 +456,7 @@ function FolderCard({
   folder,
   isNotEmpty,
   isSelected,
+  isFocused,
   isFavorite,
   startRenaming: startRenamingProp,
   onSelect,
@@ -459,6 +470,7 @@ function FolderCard({
   folder: Folder;
   isNotEmpty: boolean;
   isSelected: boolean;
+  isFocused?: boolean;
   isFavorite: boolean;
   startRenaming?: boolean;
   onSelect: () => void;
@@ -509,6 +521,7 @@ function FolderCard({
       className={cn(
         "group relative flex flex-col gap-2 rounded-xl border p-3 transition-colors cursor-pointer",
         isSelected ? "border-primary/40 bg-primary/10" : "border-border/60 bg-card hover:border-border hover:bg-accent/50",
+        isFocused && !isSelected && "ring-1 ring-inset ring-primary/50",
         isOver && !isDragging && "border-primary/40 bg-primary/10 ring-1 ring-inset ring-primary/30",
       )}
       onDoubleClick={onOpen}
@@ -520,12 +533,13 @@ function FolderCard({
         onPointerDown={stopRowPropagation}
         onDoubleClick={stopRowPropagation}
       >
-        <Checkbox checked={isSelected} onCheckedChange={onSelect} className="opacity-100" />
+        <Checkbox tabIndex={-1} checked={isSelected} onCheckedChange={onSelect} className="opacity-100" />
       </div>
 
       {/* Favorite + menu */}
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
         <button
+          tabIndex={-1}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
           onPointerDown={(e) => e.stopPropagation()}
           className={cn(
@@ -537,7 +551,7 @@ function FolderCard({
         </button>
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
+            <Button tabIndex={-1} variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
               <MoreHorizontal size={13} />
             </Button>
           </DropdownMenuTrigger>
@@ -600,6 +614,7 @@ function FolderCard({
 function FileCard({
   file,
   isSelected,
+  isFocused,
   isFavorite,
   onSelect,
   onOpen,
@@ -610,6 +625,7 @@ function FileCard({
 }: {
   file: FileMetadata;
   isSelected: boolean;
+  isFocused?: boolean;
   isFavorite: boolean;
   onSelect: () => void;
   onOpen: () => void;
@@ -639,6 +655,7 @@ function FileCard({
       className={cn(
         "group relative flex flex-col gap-2 rounded-xl border p-3 transition-colors cursor-pointer",
         isSelected ? "border-primary/40 bg-primary/10" : "border-border/60 bg-card hover:border-border hover:bg-accent/50",
+        isFocused && !isSelected && "ring-1 ring-inset ring-primary/50",
       )}
       onDoubleClick={onOpen}
     >
@@ -649,12 +666,13 @@ function FileCard({
         onPointerDown={stopRowPropagation}
         onDoubleClick={stopRowPropagation}
       >
-        <Checkbox checked={isSelected} onCheckedChange={onSelect} className="opacity-100" />
+        <Checkbox tabIndex={-1} checked={isSelected} onCheckedChange={onSelect} className="opacity-100" />
       </div>
 
       {/* Favorite + menu */}
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
         <button
+          tabIndex={-1}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
           onPointerDown={(e) => e.stopPropagation()}
           className={cn(
@@ -666,7 +684,7 @@ function FileCard({
         </button>
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
+            <Button tabIndex={-1} variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
               <MoreHorizontal size={13} />
             </Button>
           </DropdownMenuTrigger>
@@ -794,6 +812,75 @@ export function MainPanel({
     [onUpload],
   );
 
+  // ── Arrow-key navigation ───────────────────────────────────────────────────
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+
+  // Ordered flat list of all visible items: folders first, then files
+  const orderedItems = [...childFolders.map((f) => ({ id: f.id, type: 'folder' as const })),
+                        ...files.map((f) => ({ id: f.id, type: 'file' as const }))]
+
+  // Scroll focused item into view
+  useEffect(() => {
+    if (!focusedId || !contentRef.current) return;
+    const el = contentRef.current.querySelector<HTMLElement>(`[data-item-id="${focusedId}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [focusedId]);
+
+  // Clear focused id when items change (e.g. folder navigation)
+  useEffect(() => {
+    setFocusedId(null);
+  }, [currentFolderId]);
+
+  const handleContentKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Don't intercept if focus is inside an input (rename)
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+
+    const total = orderedItems.length;
+    if (total === 0) return;
+
+    const currentIndex = focusedId ? orderedItems.findIndex((item) => item.id === focusedId) : -1;
+
+    // Compute how many columns are visible (grid mode)
+    let cols = 1;
+    if (viewMode === 'grid' && contentRef.current) {
+      const firstEl = contentRef.current.querySelector<HTMLElement>('[data-item-id]');
+      const container = firstEl?.parentElement;
+      if (firstEl && container) {
+        cols = Math.round(container.offsetWidth / firstEl.offsetWidth) || 1;
+      }
+    }
+
+    let nextIndex = currentIndex;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + cols, total - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextIndex = currentIndex < 0 ? 0 : Math.max(currentIndex - cols, 0);
+    } else if (e.key === 'ArrowRight' && viewMode === 'grid') {
+      e.preventDefault();
+      nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, total - 1);
+    } else if (e.key === 'ArrowLeft' && viewMode === 'grid') {
+      e.preventDefault();
+      nextIndex = currentIndex < 0 ? 0 : Math.max(currentIndex - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (focusedId) {
+        const item = orderedItems[currentIndex];
+        if (item?.type === 'folder') onFolderOpen(item.id);
+        else if (item?.type === 'file') onOpenFile(item.id);
+      }
+      return;
+    } else {
+      return;
+    }
+
+    setFocusedId(orderedItems[nextIndex]?.id ?? null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedId, orderedItems, viewMode, onFolderOpen, onOpenFile]);
+  // ──────────────────────────────────────────────────────────────────────────
+
   // ── Rubber-band (marquee) selection ────────────────────────────────────────
   // selBox: viewport-relative rect while dragging; null when idle.
   const [selBox, setSelBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -908,6 +995,8 @@ export function MainPanel({
       <div
         ref={contentRef}
         className="relative flex-1 overflow-y-auto py-2 select-none"
+        tabIndex={-1}
+        onKeyDown={handleContentKeyDown}
         onPointerDown={handleContentPointerDown}
         onPointerMove={handleContentPointerMove}
         onPointerUp={handleContentPointerUp}
@@ -939,6 +1028,7 @@ export function MainPanel({
                   ) || allFiles.some((file) => file.folderId === folder.id)
                 }
                 isSelected={selectedIds.has(folder.id)}
+                isFocused={focusedId === folder.id}
                 isFavorite={favoriteIds.has(folder.id)}
                 startRenaming={creatingFolderId === folder.id}
                 onSelect={() => onToggleSelect(folder.id)}
@@ -955,6 +1045,7 @@ export function MainPanel({
                 key={file.id}
                 file={file}
                 isSelected={selectedIds.has(file.id)}
+                isFocused={focusedId === file.id}
                 isFavorite={favoriteIds.has(file.id)}
                 onSelect={() => onToggleSelect(file.id)}
                 onOpen={() => onOpenFile(file.id)}
@@ -978,6 +1069,7 @@ export function MainPanel({
                   allFiles.some((file) => file.folderId === folder.id)
                 }
                 isSelected={selectedIds.has(folder.id)}
+                isFocused={focusedId === folder.id}
                 isFavorite={favoriteIds.has(folder.id)}
                 startRenaming={creatingFolderId === folder.id}
                 onSelect={() => onToggleSelect(folder.id)}
@@ -994,6 +1086,7 @@ export function MainPanel({
                 key={file.id}
                 file={file}
                 isSelected={selectedIds.has(file.id)}
+                isFocused={focusedId === file.id}
                 isFavorite={favoriteIds.has(file.id)}
                 onSelect={() => onToggleSelect(file.id)}
                 onOpen={() => onOpenFile(file.id)}
