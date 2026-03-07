@@ -126,7 +126,6 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     allFiles,
     setAllFiles,
     updateAllFile,
-    removeAllFile,
   } = useFileStore();
 
   const {
@@ -279,7 +278,6 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
       invalidateFolderCache(file.folderId);
       invalidateFolderCache(targetFolderId);
       removeFile(activeId);
-      removeAllFile(activeId);
       updateAllFile({ ...file, folderId: targetFolderId });
       await moveFile(activeId, targetFolderId);
       if (targetFolderId === currentFolderId) loadFiles();
