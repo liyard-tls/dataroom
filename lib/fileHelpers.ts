@@ -43,6 +43,31 @@ export function formatModifiedDate(date: Date): string {
     + ' ' + new Date(date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * Returns a name that does not conflict with existing names in the same folder.
+ * For files, the counter is inserted before the extension: "file (1).txt".
+ * For folders (or extensionless files), the counter is appended: "folder (1)".
+ * Comparison is case-insensitive.
+ */
+export function uniqueName(desired: string, existingNames: string[]): string {
+  const lower = existingNames.map((n) => n.toLowerCase())
+  if (!lower.includes(desired.toLowerCase())) return desired
+
+  const dotIndex = desired.lastIndexOf('.')
+  const hasExt = dotIndex > 0
+  const base = hasExt ? desired.slice(0, dotIndex) : desired
+  const ext = hasExt ? desired.slice(dotIndex) : ''
+
+  let counter = 1
+  let candidate: string
+  do {
+    candidate = `${base} (${counter})${ext}`
+    counter++
+  } while (lower.includes(candidate.toLowerCase()))
+
+  return candidate
+}
+
 /** Generates a unique ID — crypto.randomUUID with fallback */
 export function generateId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {

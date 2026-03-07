@@ -31,6 +31,14 @@ import { useFileStore } from "@/store/fileStore";
 import { authService } from "@/modules/auth";
 import { fileService } from "@/modules/files/services/file.service";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -40,7 +48,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PanelLeftOpen, PanelLeftClose, Download, Trash2, LayoutGrid, List, ArrowUpDown, ListFilter, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  PanelLeftOpen,
+  PanelLeftClose,
+  Download,
+  Trash2,
+  LayoutGrid,
+  List,
+  ArrowUpDown,
+  ListFilter,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { FileType } from "@/types/file.types";
 import { FileIcon } from "@/components/common/FileIcon";
 import { useUIStore } from "@/store/uiStore";
@@ -48,7 +67,11 @@ import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { Folder } from "@/types/folder.types";
 import { resolveFolderPath, useFolderNavigation } from "@/hooks/useFolderPath";
-import { invalidateFolderCache, invalidateAllFolderCache } from "@/modules/files/hooks/useFiles";
+import {
+  invalidateFolderCache,
+  invalidateAllFolderCache,
+} from "@/modules/files/hooks/useFiles";
+import { uniqueName } from "@/lib/fileHelpers";
 import { ShareModal } from "@/modules/sharing/components/ShareModal";
 
 function isFolderDescendant(
@@ -69,10 +92,14 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
 
   // Close popup window if this is an OAuth callback (?gdrive_connected=true)
   useEffect(() => {
-    if (typeof window !== "undefined" && window.opener && window.location.search.includes("gdrive_connected=true")) {
-      window.close()
+    if (
+      typeof window !== "undefined" &&
+      window.opener &&
+      window.location.search.includes("gdrive_connected=true")
+    ) {
+      window.close();
     }
-  }, [])
+  }, []);
 
   // Derive path segments from pathname instead of useParams (layout doesn't get [[...path]] params)
   const pathSegments = pathname
@@ -92,10 +119,33 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [driveModalOpen, setDriveModalOpen] = useState(false);
-  const [shareTarget, setShareTarget] = useState<{ type: "file" | "folder"; id: string; name: string } | null>(null);
-  const [sortField, setSortField] = useState<"name" | "size" | "updatedAt">("name");
+  const [shareTarget, setShareTarget] = useState<{
+    type: "file" | "folder";
+    id: string;
+    name: string;
+  } | null>(null);
+  // Pending move that has a name conflict — waits for user confirmation
+  type PendingMove =
+    | {
+        kind: "folder";
+        id: string;
+        targetFolderId: string | null;
+        conflictName: string;
+      }
+    | {
+        kind: "files";
+        ids: string[];
+        targetFolderId: string | null;
+        conflictNames: string[];
+      };
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [sortField, setSortField] = useState<"name" | "size" | "updatedAt">(
+    "name",
+  );
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [filterTypes, setFilterTypes] = useState<Set<FileType | "folder">>(new Set());
+  const [filterTypes, setFilterTypes] = useState<Set<FileType | "folder">>(
+    new Set(),
+  );
 
   const {
     folders,
@@ -112,12 +162,17 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
 
   // Sync URL path → currentFolderId.
   const foldersRef = useRef(folders);
-  useEffect(() => { foldersRef.current = folders; }, [folders]);
+  useEffect(() => {
+    foldersRef.current = folders;
+  }, [folders]);
   const foldersLoaded = folders.length > 0;
 
   useEffect(() => {
     if (!foldersLoaded) return;
-    const { folderId, found } = resolveFolderPath(pathSegments, foldersRef.current);
+    const { folderId, found } = resolveFolderPath(
+      pathSegments,
+      foldersRef.current,
+    );
     if (!found) {
       router.replace("/dataroom");
       return;
@@ -125,7 +180,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     if (folderId !== currentFolderId) {
       setCurrentFolderId(folderId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [foldersLoaded, pathSegments.join("/")]);
 
   const {
@@ -176,25 +231,52 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   }, [user, setAllFiles]);
 
   const loadAllFilesRef = useRef(loadAllFiles);
-  useEffect(() => { loadAllFilesRef.current = loadAllFiles; }, [loadAllFiles]);
+  useEffect(() => {
+    loadAllFilesRef.current = loadAllFiles;
+  }, [loadAllFiles]);
 
   const folderIdsKey = folders.map((f) => f.id).join(",");
   useEffect(() => {
     void loadAllFilesRef.current();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderIdsKey]);
 
-  const handleUploadFiles = useCallback(async (browserFiles: File[]) => {
-    invalidateFolderCache(currentFolderId);
-    await uploadFiles(browserFiles);
-    void loadAllFiles();
-  }, [uploadFiles, loadAllFiles, currentFolderId]);
+  const handleUploadFiles = useCallback(
+    async (browserFiles: File[]) => {
+      // Deduplicate names against existing files in the current folder.
+      // Also handle duplicates within the batch itself (e.g. uploading two "a.txt").
+      const takenNames = files.map((f) => f.name);
+      const renamedFiles = browserFiles.map((f) => {
+        const name = uniqueName(f.name, takenNames);
+        takenNames.push(name);
+        return name === f.name ? f : new File([f], name, { type: f.type });
+      });
+      invalidateFolderCache(currentFolderId);
+      await uploadFiles(renamedFiles);
+      void loadAllFiles();
+    },
+    [uploadFiles, loadAllFiles, currentFolderId, files],
+  );
 
-  const handleDeleteFile = useCallback(async (id: string) => {
-    invalidateFolderCache(currentFolderId);
-    await deleteFile(id);
-    void loadAllFiles();
-  }, [deleteFile, loadAllFiles, currentFolderId]);
+  const handleCreateFolder = useCallback(
+    async (name: string, parentId: string | null = null) => {
+      const siblings = folders
+        .filter((f) => f.parentId === parentId)
+        .map((f) => f.name);
+      const resolvedName = uniqueName(name, siblings);
+      return createFolder(resolvedName, parentId);
+    },
+    [createFolder, folders],
+  );
+
+  const handleDeleteFile = useCallback(
+    async (id: string) => {
+      invalidateFolderCache(currentFolderId);
+      await deleteFile(id);
+      void loadAllFiles();
+    },
+    [deleteFile, loadAllFiles, currentFolderId],
+  );
 
   const handleDeleteSelected = useCallback(async () => {
     invalidateFolderCache(currentFolderId);
@@ -205,17 +287,21 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
 
   const displayedFiles = useMemo(() => {
-    const fileTypeFilters = [...filterTypes].filter((t) => t !== "folder") as FileType[];
-    let result = fileTypeFilters.length > 0
-      ? files.filter((f) => fileTypeFilters.includes(f.type))
-      : filterTypes.has("folder") && filterTypes.size === 1
-        ? []
-        : files;
+    const fileTypeFilters = [...filterTypes].filter(
+      (t) => t !== "folder",
+    ) as FileType[];
+    let result =
+      fileTypeFilters.length > 0
+        ? files.filter((f) => fileTypeFilters.includes(f.type))
+        : filterTypes.has("folder") && filterTypes.size === 1
+          ? []
+          : files;
     result = [...result].sort((a, b) => {
       let cmp = 0;
       if (sortField === "name") cmp = a.name.localeCompare(b.name);
       else if (sortField === "size") cmp = a.size - b.size;
-      else cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      else
+        cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
@@ -226,9 +312,16 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     const hideFolders = filterTypes.size > 0 && !filterTypes.has("folder");
     if (hideFolders) return [];
     return [...children].sort((a, b) => {
-      if (sortField === "name") return sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-      if (sortField === "size") return sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-      const cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      if (sortField === "name")
+        return sortDir === "asc"
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      if (sortField === "size")
+        return sortDir === "asc"
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      const cmp =
+        new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [folders, currentFolderId, sortField, sortDir, filterTypes]);
@@ -258,6 +351,49 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     setActiveDragId(null);
   }
 
+  async function executePendingMove() {
+    if (!pendingMove) return;
+    setPendingMove(null);
+
+    if (pendingMove.kind === "folder") {
+      const { id, targetFolderId } = pendingMove;
+      const folder = folders.find((f) => f.id === id)!;
+      const siblings = folders
+        .filter((f) => f.parentId === targetFolderId)
+        .map((f) => f.name);
+      const resolvedName = uniqueName(folder.name, siblings);
+      // Rename first, then move. moveFolder does an optimistic update using its
+      // captured `folders` closure which still has the old name — calling
+      // loadFolders() after both operations ensures the store reflects both changes.
+      if (resolvedName !== folder.name) await renameFolder(id, resolvedName);
+      await moveFolder(id, targetFolderId);
+      await loadFolders();
+    } else {
+      const { ids, targetFolderId } = pendingMove;
+      const targetFileNames = allFiles
+        .filter((f) => f.folderId === targetFolderId)
+        .map((f) => f.name);
+      const takenNames = [...targetFileNames];
+      for (const id of ids) {
+        const file = allFiles.find((f) => f.id === id);
+        if (!file) continue;
+        const resolvedName = uniqueName(file.name, takenNames);
+        takenNames.push(resolvedName);
+        if (resolvedName !== file.name) await renameFile(id, resolvedName);
+        invalidateFolderCache(file.folderId);
+        removeFile(id);
+        updateAllFile({
+          ...file,
+          name: resolvedName,
+          folderId: targetFolderId,
+        });
+        await moveFile(id, targetFolderId);
+      }
+      invalidateFolderCache(targetFolderId);
+      if (targetFolderId === currentFolderId) loadFiles();
+    }
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     setActiveDragId(null);
     const { active, over } = event;
@@ -268,7 +404,9 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
 
     let targetFolderId: string | null;
     if (overId === "main-panel") {
-      targetFolderId = (over.data.current as { folderId: string | null } | undefined)?.folderId ?? null;
+      targetFolderId =
+        (over.data.current as { folderId: string | null } | undefined)
+          ?.folderId ?? null;
     } else if (
       overId === "folder-root" ||
       overId === "folder-root-bottom" ||
@@ -291,24 +429,65 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
 
     if (isFolder) {
       // Folders always move individually
-      if (targetFolderId !== activeId && !isFolderDescendant(activeId, targetFolderId, folders)) {
-        moveFolder(activeId, targetFolderId);
+      if (
+        targetFolderId === activeId ||
+        isFolderDescendant(activeId, targetFolderId, folders)
+      )
+        return;
+      const folder = folders.find((f) => f.id === activeId)!;
+      const siblings = folders
+        .filter((f) => f.parentId === targetFolderId)
+        .map((f) => f.name);
+      if (siblings.some((n) => n.toLowerCase() === folder.name.toLowerCase())) {
+        setPendingMove({
+          kind: "folder",
+          id: activeId,
+          targetFolderId,
+          conflictName: folder.name,
+        });
+        return;
       }
+      moveFolder(activeId, targetFolderId);
     } else {
       // Determine which file IDs to move: if the dragged file is in the selection,
       // move all selected files; otherwise move only the dragged file.
-      const idsToMove = selectedIds.has(activeId) && selectedIds.size > 1
-        ? Array.from(selectedIds).filter((id) => allFiles.some((f) => f.id === id))
-        : [activeId];
+      const idsToMove =
+        selectedIds.has(activeId) && selectedIds.size > 1
+          ? Array.from(selectedIds).filter((id) =>
+              allFiles.some((f) => f.id === id),
+            )
+          : [activeId];
 
-      for (const id of idsToMove) {
-        const file = allFiles.find((f) => f.id === id);
-        if (file && file.folderId !== targetFolderId) {
-          invalidateFolderCache(file.folderId);
-          removeFile(id);
-          updateAllFile({ ...file, folderId: targetFolderId });
-          await moveFile(id, targetFolderId);
-        }
+      const targetFileNames = allFiles
+        .filter((f) => f.folderId === targetFolderId)
+        .map((f) => f.name);
+      const filesToMove = idsToMove
+        .map((id) => allFiles.find((f) => f.id === id))
+        .filter(Boolean) as typeof allFiles;
+      const movingFiles = filesToMove.filter(
+        (f) => f.folderId !== targetFolderId,
+      );
+      const conflictNames = movingFiles
+        .map((f) => f.name)
+        .filter((name) =>
+          targetFileNames.some((n) => n.toLowerCase() === name.toLowerCase()),
+        );
+
+      if (conflictNames.length > 0) {
+        setPendingMove({
+          kind: "files",
+          ids: movingFiles.map((f) => f.id),
+          targetFolderId,
+          conflictNames,
+        });
+        return;
+      }
+
+      for (const file of movingFiles) {
+        invalidateFolderCache(file.folderId);
+        removeFile(file.id);
+        updateAllFile({ ...file, folderId: targetFolderId });
+        await moveFile(file.id, targetFolderId);
       }
       invalidateFolderCache(targetFolderId);
       if (targetFolderId === currentFolderId) loadFiles();
@@ -320,8 +499,12 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   }
 
-  const draggedFolder = activeDragId ? folders.find((f) => f.id === activeDragId) : undefined;
-  const draggedFile = activeDragId ? allFiles.find((f) => f.id === activeDragId) : undefined;
+  const draggedFolder = activeDragId
+    ? folders.find((f) => f.id === activeDragId)
+    : undefined;
+  const draggedFile = activeDragId
+    ? allFiles.find((f) => f.id === activeDragId)
+    : undefined;
   const draggedFolderHasContent =
     !!draggedFolder &&
     (folders.some((f) => f.parentId === draggedFolder.id) ||
@@ -346,9 +529,12 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
             folders={folders}
             currentFolderId={currentFolderId}
             onNavigate={navigate}
-            onCreateFolder={createFolder}
+            onCreateFolder={handleCreateFolder}
             onRenameFolder={renameFolder}
-            onDeleteFolder={async (id) => { invalidateAllFolderCache(); await deleteFolder(id); }}
+            onDeleteFolder={async (id) => {
+              invalidateAllFolderCache();
+              await deleteFolder(id);
+            }}
             user={user}
             files={allFiles}
             onUploadFiles={handleUploadFiles}
@@ -363,8 +549,17 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
 
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex items-center gap-3 border-b bg-background px-6 py-2.5">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleSidebar}>
-              {isSidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={toggleSidebar}
+            >
+              {isSidebarCollapsed ? (
+                <PanelLeftOpen size={15} />
+              ) : (
+                <PanelLeftClose size={15} />
+              )}
             </Button>
             <div className="h-5 w-px shrink-0 bg-border/100" />
             <Breadcrumb path={breadcrumbPath} onNavigate={navigate} />
@@ -372,14 +567,21 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
             {selectedIds.size > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
-                  {selectedIds.size} item{selectedIds.size !== 1 ? "s" : ""} selected
+                  {selectedIds.size} item{selectedIds.size !== 1 ? "s" : ""}{" "}
+                  selected
                 </span>
-                <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => downloadSelected(folders)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  onClick={() => downloadSelected(folders)}
+                >
                   <Download size={13} />
                   Download
                 </Button>
                 <Button
-                  variant="outline" size="sm"
+                  variant="outline"
+                  size="sm"
                   className="h-8 gap-1.5 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={handleDeleteSelected}
                 >
@@ -390,25 +592,46 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
             )}
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-muted-foreground">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-muted-foreground"
+                >
                   <ArrowUpDown size={13} />
                   Sort
-                  {sortDir === "asc" ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
+                  {sortDir === "asc" ? (
+                    <ArrowUp size={11} />
+                  ) : (
+                    <ArrowDown size={11} />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Sort by</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Sort by
+                </DropdownMenuLabel>
                 {(["name", "size", "updatedAt"] as const).map((field) => (
                   <DropdownMenuItem
                     key={field}
                     onClick={() => {
-                      if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-                      else { setSortField(field); setSortDir("asc"); }
+                      if (sortField === field)
+                        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                      else {
+                        setSortField(field);
+                        setSortDir("asc");
+                      }
                     }}
                     className="flex items-center justify-between"
                   >
-                    <span>{{ name: "Name", size: "Size", updatedAt: "Date" }[field]}</span>
-                    {sortField === field && (sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                    <span>
+                      {{ name: "Name", size: "Size", updatedAt: "Date" }[field]}
+                    </span>
+                    {sortField === field &&
+                      (sortDir === "asc" ? (
+                        <ArrowUp size={12} />
+                      ) : (
+                        <ArrowDown size={12} />
+                      ))}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -417,8 +640,14 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="outline" size="sm"
-                  className={cn("h-8 gap-1.5", filterTypes.size > 0 ? "border-primary text-primary" : "text-muted-foreground")}
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-8 gap-1.5",
+                    filterTypes.size > 0
+                      ? "border-primary text-primary"
+                      : "text-muted-foreground",
+                  )}
                 >
                   <ListFilter size={13} />
                   Filter
@@ -430,9 +659,21 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Show</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Show
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {(["folder", "pdf", "image", "video", "text", "md", "other"] as (FileType | "folder")[]).map((type) => (
+                {(
+                  [
+                    "folder",
+                    "pdf",
+                    "image",
+                    "video",
+                    "text",
+                    "md",
+                    "other",
+                  ] as (FileType | "folder")[]
+                ).map((type) => (
                   <DropdownMenuItem
                     key={type}
                     onSelect={(e) => {
@@ -445,14 +686,22 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                     }}
                     className="flex items-center gap-2"
                   >
-                    <Checkbox checked={filterTypes.has(type)} className="pointer-events-none" />
-                    <span className="capitalize">{type === "folder" ? "Folders" : type}</span>
+                    <Checkbox
+                      checked={filterTypes.has(type)}
+                      className="pointer-events-none"
+                    />
+                    <span className="capitalize">
+                      {type === "folder" ? "Folders" : type}
+                    </span>
                   </DropdownMenuItem>
                 ))}
                 {filterTypes.size > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setFilterTypes(new Set())} className="text-muted-foreground">
+                    <DropdownMenuItem
+                      onClick={() => setFilterTypes(new Set())}
+                      className="text-muted-foreground"
+                    >
                       Clear filters
                     </DropdownMenuItem>
                   </>
@@ -461,10 +710,22 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
             </DropdownMenu>
 
             <div className="flex items-center rounded-lg border border-border/60 p-0.5">
-              <Button variant="ghost" size="icon" className={cn("h-7 w-7", viewMode === "list" && "bg-accent")} onClick={() => setViewMode("list")} title="List view">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-7 w-7", viewMode === "list" && "bg-accent")}
+                onClick={() => setViewMode("list")}
+                title="List view"
+              >
                 <List size={14} />
               </Button>
-              <Button variant="ghost" size="icon" className={cn("h-7 w-7", viewMode === "grid" && "bg-accent")} onClick={() => setViewMode("grid")} title="Grid view">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-7 w-7", viewMode === "grid" && "bg-accent")}
+                onClick={() => setViewMode("grid")}
+                title="Grid view"
+              >
                 <LayoutGrid size={14} />
               </Button>
             </div>
@@ -491,8 +752,11 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               onUpload={handleUploadFiles}
               onFolderOpen={navigate}
               onFolderRename={renameFolder}
-              onFolderDelete={async (id) => { invalidateAllFolderCache(); await deleteFolder(id); }}
-              onFolderCreate={createFolder}
+              onFolderDelete={async (id) => {
+                invalidateAllFolderCache();
+                await deleteFolder(id);
+              }}
+              onFolderCreate={handleCreateFolder}
               onToggleSelect={toggleSelection}
               onSelectAll={selectAll}
               onClearSelection={clearSelection}
@@ -505,7 +769,8 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               }}
               onShareFolder={(id) => {
                 const folder = folders.find((f) => f.id === id);
-                if (folder) setShareTarget({ type: "folder", id, name: folder.name });
+                if (folder)
+                  setShareTarget({ type: "folder", id, name: folder.name });
               }}
             />
           </main>
@@ -515,7 +780,10 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
       <DragOverlay dropAnimation={null} zIndex={1200}>
         {draggedFolder && (
           <div className="pointer-events-none flex items-center gap-2 text-base text-foreground">
-            <FileIcon type={draggedFolderHasContent ? "folder-filled" : "folder"} size={18} />
+            <FileIcon
+              type={draggedFolderHasContent ? "folder-filled" : "folder"}
+              size={18}
+            />
             <span className="max-w-[22rem] truncate">{draggedFolder.name}</span>
           </div>
         )}
@@ -537,10 +805,66 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
           onClose={() => setShareTarget(null)}
         />
       )}
+      {pendingMove && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setPendingMove(null);
+          }}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Name conflict</DialogTitle>
+              <DialogDescription>
+                {pendingMove.kind === "folder" ? (
+                  <>
+                    Folder{" "}
+                    <strong>&ldquo;{pendingMove.conflictName}&rdquo;</strong>{" "}
+                    already exists in the destination. Move anyway and rename it
+                    automatically?
+                  </>
+                ) : (
+                  <>
+                    {pendingMove.conflictNames.length === 1 ? (
+                      <>
+                        <strong>
+                          &ldquo;{pendingMove.conflictNames[0]}&rdquo;
+                        </strong>{" "}
+                        already exists in the destination.
+                      </>
+                    ) : (
+                      <>
+                        <strong>
+                          {pendingMove.conflictNames.length} items
+                        </strong>{" "}
+                        already exist in the destination (
+                        {pendingMove.conflictNames.join(", ")}).
+                      </>
+                    )}{" "}
+                    Move anyway and rename automatically?
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-3 sm:justify-center">
+              <Button variant="outline" className="w-36" onClick={() => setPendingMove(null)}>
+                Cancel
+              </Button>
+              <Button className="w-36" onClick={() => void executePendingMove()}>
+                Move and rename
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       {driveModalOpen && (
         <GoogleDriveModal
           currentFolderId={currentFolderId}
-          onImported={() => { invalidateFolderCache(currentFolderId); void loadFiles(); void loadAllFiles(); }}
+          onImported={() => {
+            invalidateFolderCache(currentFolderId);
+            void loadFiles();
+            void loadAllFiles();
+          }}
           onClose={() => setDriveModalOpen(false)}
         />
       )}
@@ -548,7 +872,11 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function DataRoomLayout({ children }: { children: React.ReactNode }) {
+export default function DataRoomLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <AuthGuard>
       <DataRoomApp>{children}</DataRoomApp>
