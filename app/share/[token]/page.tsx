@@ -59,7 +59,7 @@ function TextFromUrl({ url }: { url: string }) {
   }, [url])
   if (text === null) return <div className="flex justify-center py-12"><Loader2 className="animate-spin" /></div>
   return (
-    <pre className="h-full w-full overflow-auto rounded-lg border bg-muted/40 p-4 text-xs font-mono">
+    <pre className="h-full w-full select-text overflow-auto rounded-lg border bg-muted/40 p-4 text-xs font-mono">
       {text}
     </pre>
   )

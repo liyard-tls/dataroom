@@ -105,16 +105,16 @@ export function TextViewer({ blob, isMarkdown }: TextViewerProps) {
   }, [blob])
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full select-text">
       <div className="p-6">
         {isMarkdown ? (
-          <article className="max-w-none text-left">
+          <article className="max-w-none text-left select-text">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {content}
             </ReactMarkdown>
           </article>
         ) : (
-          <pre className="whitespace-pre-wrap break-words font-mono text-sm text-foreground">
+          <pre className="whitespace-pre-wrap break-words font-mono text-sm text-foreground select-text">
             {content}
           </pre>
         )}

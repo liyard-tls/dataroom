@@ -130,6 +130,15 @@
   }
 }
 
+/* Disable text selection everywhere except elements that explicitly opt in via .select-text */
+*:not(input):not(textarea):not([contenteditable]) {
+  user-select: none;
+}
+.select-text,
+.select-text *:not(input):not(textarea):not([contenteditable]) {
+  user-select: text;
+}
+
 /* Prevent Radix Dialog from injecting margin/padding compensation.
    Body already has overflow:hidden so there is no scrollbar to compensate for.
    Must be outside @layer to win specificity over Radix injected <style> tags. */
