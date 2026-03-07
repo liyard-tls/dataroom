@@ -35,7 +35,7 @@ def _file_type(mime_type: str | None) -> str:
     return "other"
 
 
-@search_bp.get("/")
+@search_bp.get("/", strict_slashes=False)
 @require_owner
 def search():
     query = (request.args.get("q") or "").strip().lower()

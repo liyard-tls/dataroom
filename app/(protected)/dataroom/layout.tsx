@@ -144,6 +144,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
         conflictNames: string[];
       };
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [focusItemId, setFocusItemId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<"name" | "size" | "updatedAt">(
     "name",
   );
@@ -754,7 +755,17 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                 <LayoutGrid size={14} />
               </Button>
             </div>
-            <SearchBar ref={searchInputRef} />
+            <SearchBar
+              ref={searchInputRef}
+              onSelect={(result) => {
+                if (result.type === 'folder') {
+                  navigate(result.id)
+                } else {
+                  navigate(result.folderId)
+                  setFocusItemId(result.id)
+                }
+              }}
+            />
             <ThemeToggle />
           </header>
 
@@ -794,6 +805,8 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               }}
               creatingFolderId={creatingFolderId}
               onCreatingFolderEnd={() => setCreatingFolderId(null)}
+              focusItemId={focusItemId}
+              onFocusItemConsumed={() => setFocusItemId(null)}
               onShareFolder={(id) => {
                 const folder = folders.find((f) => f.id === id);
                 if (folder)

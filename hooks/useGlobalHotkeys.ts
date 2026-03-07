@@ -33,12 +33,14 @@ export function useGlobalHotkeys({
   useHotkeys(
     'escape',
     () => {
-      ;(document.activeElement as HTMLElement | null)?.blur()
-      window.getSelection()?.removeAllRanges()
       if (viewerFile) {
         closeViewer()
-      } else if (selectedIds.size > 0) {
-        clearSelection()
+      } else {
+        ;(document.activeElement as HTMLElement | null)?.blur()
+        window.getSelection()?.removeAllRanges()
+        if (selectedIds.size > 0) {
+          clearSelection()
+        }
       }
     },
     { preventDefault: true },

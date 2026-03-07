@@ -58,6 +58,9 @@ interface MainPanelProps {
   onShareFolder: (id: string) => void;
   creatingFolderId?: string | null;
   onCreatingFolderEnd?: () => void;
+  // Set this to focus a specific item via keyboard (e.g. after search navigation)
+  focusItemId?: string | null;
+  onFocusItemConsumed?: () => void;
 }
 
 // Shared column widths — identical in header and every row
@@ -774,6 +777,8 @@ export function MainPanel({
   onShareFolder,
   creatingFolderId,
   onCreatingFolderEnd,
+  focusItemId,
+  onFocusItemConsumed,
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -830,6 +835,17 @@ export function MainPanel({
   useEffect(() => {
     setFocusedId(null);
   }, [currentFolderId]);
+
+  // Focus a specific item requested from outside (e.g. after search navigation).
+  // Wait until the item appears in orderedItems (folder may still be loading).
+  useEffect(() => {
+    if (!focusItemId) return;
+    const found = orderedItems.some((item) => item.id === focusItemId);
+    if (!found) return;
+    setFocusedId(focusItemId);
+    onFocusItemConsumed?.();
+    contentRef.current?.focus();
+  }, [focusItemId, orderedItems, onFocusItemConsumed]);
 
   const handleContentKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Don't intercept if focus is inside an input (rename)
