@@ -67,7 +67,13 @@ function SidebarFileNode({
   isActive?: boolean;
   onOpenFile: (id: string) => void;
 }) {
-  const { setNodeRef: setDraggableRef, attributes, listeners, transform, isDragging } = useDraggable({
+  const {
+    setNodeRef: setDraggableRef,
+    attributes,
+    listeners,
+    transform,
+    isDragging,
+  } = useDraggable({
     id: file.id,
   });
   // Root files act as a drop target for "move to root"
@@ -117,7 +123,9 @@ function isFolderOrDescendant(
   if (!targetId) return false;
   if (folderId === targetId) return true;
   const children = childFoldersByParentId.get(folderId) ?? [];
-  return children.some((c) => isFolderOrDescendant(c.id, targetId, childFoldersByParentId));
+  return children.some((c) =>
+    isFolderOrDescendant(c.id, targetId, childFoldersByParentId),
+  );
 }
 
 function FolderNode({
@@ -144,8 +152,14 @@ function FolderNode({
   const isActive = currentFolderId === folder.id;
 
   // Auto-expand when current folder or active file is inside this folder
-  const containsCurrentFolder = isFolderOrDescendant(folder.id, currentFolderId, childFoldersByParentId);
-  const containsActiveFile = activeFileId ? filesInFolder.some((f) => f.id === activeFileId) : false;
+  const containsCurrentFolder = isFolderOrDescendant(
+    folder.id,
+    currentFolderId,
+    childFoldersByParentId,
+  );
+  const containsActiveFile = activeFileId
+    ? filesInFolder.some((f) => f.id === activeFileId)
+    : false;
   useEffect(() => {
     if (containsCurrentFolder || containsActiveFile) setIsExpanded(true);
   }, [containsCurrentFolder, containsActiveFile]);
@@ -155,8 +169,13 @@ function FolderNode({
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: `folder-${folder.id}`,
   });
-  const { attributes, listeners, setNodeRef: setDraggableRef, isDragging, transform } =
-    useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDraggableRef,
+    isDragging,
+    transform,
+  } = useDraggable({
     id: folder.id,
   });
 
@@ -240,11 +259,7 @@ function FolderNode({
           onClick={() => setIsExpanded((v) => !v)}
           className="flex-shrink-0 p-0.5 text-muted-foreground hover:text-foreground"
         >
-          {isExpanded ? (
-            <ChevronDown size={14} />
-          ) : (
-            <ChevronRight size={14} />
-          )}
+          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
 
         {isRenaming ? (
@@ -361,14 +376,16 @@ function FolderNode({
                 />
               ))}
             </AnimatePresence>
-            {!isCreating && children.length === 0 && filesInFolder.length === 0 && (
-              <div
-                className="px-3 py-1.5 text-sm italic text-muted-foreground"
-                style={{ paddingLeft: `${(depth + 1) * 12 + 32}px` }}
-              >
-                Folder is empty
-              </div>
-            )}
+            {!isCreating &&
+              children.length === 0 &&
+              filesInFolder.length === 0 && (
+                <div
+                  className="px-3 py-1.5 text-sm italic text-muted-foreground"
+                  style={{ paddingLeft: `${(depth + 1) * 12 + 32}px` }}
+                >
+                  Folder is empty
+                </div>
+              )}
             {filesInFolder.map((file) => (
               <SidebarFileNode
                 key={file.id}
@@ -412,9 +429,10 @@ export function Sidebar({
   });
 
   // Bottom root drop zone
-  const { setNodeRef: setRootBottomRef, isOver: isRootBottomOver } = useDroppable({
-    id: "folder-root-bottom",
-  });
+  const { setNodeRef: setRootBottomRef, isOver: isRootBottomOver } =
+    useDroppable({
+      id: "folder-root-bottom",
+    });
 
   const childFoldersByParentId = useMemo(() => {
     const map = new Map<string | null, Folder[]>();
@@ -437,10 +455,7 @@ export function Sidebar({
     return map;
   }, [files]);
 
-  const rootFiles = useMemo(
-    () => files.filter((f) => !f.folderId),
-    [files],
-  );
+  const rootFiles = useMemo(() => files.filter((f) => !f.folderId), [files]);
 
   const rootFolders = childFoldersByParentId.get(null) ?? [];
 
@@ -478,20 +493,24 @@ export function Sidebar({
       className="relative flex h-full flex-col bg-muted/30"
       style={{
         borderRight: "1px solid transparent",
-        borderImage: "linear-gradient(to bottom, rgba(34,197,94,0.35) 0%, rgba(128,128,128,0.12) 100%) 1",
+        borderImage:
+          "linear-gradient(to bottom, rgba(34,197,94,0.35) 0%, rgba(128,128,128,0.12) 100%) 1",
       }}
     >
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background: "radial-gradient(circle at top left, rgba(34,197,94,0.2) 0%, transparent 45%)",
+          background:
+            "radial-gradient(circle at top left, rgba(34,197,94,0.2) 0%, transparent 45%)",
           backgroundImage: [
             "radial-gradient(circle at top left, rgba(34,197,94,0.2) 0%, transparent 45%)",
             "radial-gradient(circle, rgba(34,197,94,0.12) 1px, transparent 1px)",
           ].join(", "),
           backgroundSize: "100% 100%, 20px 20px",
-          maskImage: "radial-gradient(circle at top left, black 0%, transparent 50%)",
-          WebkitMaskImage: "radial-gradient(circle at top left, black 0%, transparent 50%)",
+          maskImage:
+            "radial-gradient(circle at top left, black 0%, transparent 50%)",
+          WebkitMaskImage:
+            "radial-gradient(circle at top left, black 0%, transparent 50%)",
         }}
       />
       {/* Logo */}
@@ -501,7 +520,7 @@ export function Sidebar({
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-8 overflow-y-auto px-5 pb-4">
+      <div className="flex flex-1 flex-col gap-8 overflow-hidden px-5 pb-4">
         {/* Quick actions */}
         <div>
           <span className="text-sm font-medium tracking-wide text-muted-foreground">
@@ -524,18 +543,6 @@ export function Sidebar({
               <Upload size={15} className="mr-2" />
               Upload files
             </Button>
-            <Button
-              variant="outline"
-              className="h-10 w-full justify-start rounded-lg px-3 backdrop-blur-md"
-              onClick={() => {
-                setIsCreatingRoot(true);
-                setRootName("");
-              }}
-              title="New root folder"
-            >
-              <FolderPlus size={15} className="mr-2" />
-              New folder
-            </Button>
           </div>
         </div>
 
@@ -546,7 +553,9 @@ export function Sidebar({
           </span>
           <div className="mt-2">
             {favoriteFiles.length === 0 && favoriteFolders.length === 0 ? (
-              <p className="px-1 py-2 text-xs text-muted-foreground/60">No favorites yet</p>
+              <p className="px-1 py-2 text-xs text-muted-foreground/60">
+                No favorites yet
+              </p>
             ) : (
               <>
                 {favoriteFolders.map((folder) => (
@@ -574,21 +583,34 @@ export function Sidebar({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* Root drop zone */}
-          <button
-            ref={setRootRef}
-            className={cn(
-              "mb-5 block w-full rounded-md px-1 py-1 text-left text-sm font-medium tracking-wide text-muted-foreground transition-colors",
-              "hover:text-foreground",
-              isRootOver && "bg-accent/60",
-            )}
-            onClick={() => onNavigate(null)}
-          >
-            {roomLabel}
-          </button>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* Fixed header: room label + new folder button */}
+          <div className="flex shrink-0 items-center justify-between pb-2">
+            <button
+              ref={setRootRef}
+              className={cn(
+                "rounded-md px-1 py-1 text-left text-sm font-medium tracking-wide text-muted-foreground transition-colors",
+                "hover:text-foreground",
+                isRootOver && "bg-accent/60",
+              )}
+              onClick={() => onNavigate(null)}
+            >
+              {roomLabel}
+            </button>
+            <button
+              onClick={() => {
+                setIsCreatingRoot(true);
+                setRootName("");
+              }}
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              title="New folder"
+            >
+              <FolderPlus size={14} />
+            </button>
+          </div>
+
           {isCreatingRoot && (
-            <div className="mb-2 flex items-center gap-1 px-3 py-1">
+            <div className="mb-2 flex items-center gap-1 px-1 py-1">
               <FileIcon type="folder" size={14} />
               <Input
                 autoFocus
@@ -610,45 +632,75 @@ export function Sidebar({
             </div>
           )}
 
-          {rootFolders.map((folder) => (
-            <FolderNode
-              key={folder.id}
-              folder={folder}
-              childFoldersByParentId={childFoldersByParentId}
-              filesByFolderId={filesByFolderId}
-              currentFolderId={currentFolderId}
-              activeFileId={activeFileId}
-              depth={0}
-              onNavigate={onNavigate}
-              onCreateFolder={onCreateFolder}
-              onRenameFolder={onRenameFolder}
-              onDeleteFolder={onDeleteFolder}
-              onOpenFile={onOpenFile}
-            />
-          ))}
-          {rootFiles.map((file) => (
-            <SidebarFileNode
-              key={file.id}
-              file={file}
-              depth={0}
-              isRootFile
-              isActive={file.id === activeFileId}
-              onOpenFile={onOpenFile}
-            />
-          ))}
-          {isDragging && (
-            <div
-              ref={setRootBottomRef}
-              className={cn(
-                "mt-1 flex h-10 items-center justify-center rounded-md border border-dashed transition-colors",
-                isRootBottomOver
-                  ? "border-primary/40 bg-primary/10 text-xs text-foreground"
-                  : "border-border text-xs text-muted-foreground/50",
+          {/* Scrollable tree */}
+          <div className="flex-1 overflow-y-auto">
+            {rootFolders.length === 0 &&
+              rootFiles.length === 0 &&
+              !isCreatingRoot && (
+                <div className="px-1 py-16 text-center text-xs leading-relaxed text-muted-foreground/60">
+                  <p>No content yet.</p>
+                  <p>
+                    <button
+                      className="text-primary underline-offset-2 hover:underline"
+                      onClick={() => uploadInputRef.current?.click()}
+                    >
+                      Upload
+                    </button>{" "}
+                    or{" "}
+                    <button
+                      className="text-primary underline-offset-2 hover:underline"
+                      onClick={() => {
+                        setIsCreatingRoot(true);
+                        setRootName("");
+                      }}
+                    >
+                      create a folder
+                    </button>
+                    .
+                  </p>
+                </div>
               )}
-            >
-              Move to root
-            </div>
-          )}
+
+            {rootFolders.map((folder) => (
+              <FolderNode
+                key={folder.id}
+                folder={folder}
+                childFoldersByParentId={childFoldersByParentId}
+                filesByFolderId={filesByFolderId}
+                currentFolderId={currentFolderId}
+                activeFileId={activeFileId}
+                depth={0}
+                onNavigate={onNavigate}
+                onCreateFolder={onCreateFolder}
+                onRenameFolder={onRenameFolder}
+                onDeleteFolder={onDeleteFolder}
+                onOpenFile={onOpenFile}
+              />
+            ))}
+            {rootFiles.map((file) => (
+              <SidebarFileNode
+                key={file.id}
+                file={file}
+                depth={0}
+                isRootFile
+                isActive={file.id === activeFileId}
+                onOpenFile={onOpenFile}
+              />
+            ))}
+            {isDragging && (
+              <div
+                ref={setRootBottomRef}
+                className={cn(
+                  "mt-1 flex h-10 items-center justify-center rounded-md border border-dashed transition-colors",
+                  isRootBottomOver
+                    ? "border-primary/40 bg-primary/10 text-xs text-foreground"
+                    : "border-border text-xs text-muted-foreground/50",
+                )}
+              >
+                Move to root
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
