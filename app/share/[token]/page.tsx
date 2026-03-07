@@ -108,7 +108,7 @@ interface RawFolder { id: string; name: string; parentId: string | null; updated
 interface RawFile { id: string; name: string; mimeType: string; size: number; folderId: string | null; updatedAt: string }
 
 function FolderSharePage({ info, token }: { info: ShareInfo; token: string }) {
-  const rootFolder = info.resource as RawFolder
+  const rootFolder = info.resource as unknown as RawFolder
   const [tree, setTree] = useState<PublicFolderTree | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [currentFolderId, setCurrentFolderId] = useState<string>(rootFolder.id)
@@ -123,8 +123,8 @@ function FolderSharePage({ info, token }: { info: ShareInfo; token: string }) {
   if (error) return <ErrorPage message={error} />
   if (!tree) return <LoadingPage />
 
-  const folders = tree.folders as RawFolder[]
-  const files = tree.files as RawFile[]
+  const folders = tree.folders as unknown as RawFolder[]
+  const files = tree.files as unknown as RawFile[]
 
   // Breadcrumb: walk from currentFolderId up to rootFolder
   function buildBreadcrumb(): RawFolder[] {
