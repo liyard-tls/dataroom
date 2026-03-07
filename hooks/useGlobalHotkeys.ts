@@ -11,6 +11,7 @@ interface UseGlobalHotkeysOptions {
   onDeleteSelected: () => void
   onSelectAll: () => void
   onNavigateUp: () => void
+  onImportFromDrive?: () => void
   searchInputRef: RefObject<HTMLInputElement | null>
 }
 
@@ -22,6 +23,7 @@ export function useGlobalHotkeys({
   onDeleteSelected,
   onSelectAll,
   onNavigateUp,
+  onImportFromDrive,
   searchInputRef,
 }: UseGlobalHotkeysOptions) {
   const { closeViewer, viewerFile, toggleSidebar } = useUIStore()
@@ -79,6 +81,14 @@ export function useGlobalHotkeys({
 
   // Ctrl+B — toggle sidebar
   useHotkeys('ctrl+b, meta+b', toggleSidebar, { preventDefault: true }, [toggleSidebar])
+
+  // Ctrl+Shift+G — import from Google Drive
+  useHotkeys(
+    'ctrl+shift+g, meta+shift+g',
+    () => onImportFromDrive?.(),
+    { preventDefault: true, enabled: !!onImportFromDrive },
+    [onImportFromDrive],
+  )
 
   // Backspace (no modifier, not in input) — navigate to parent folder
   useHotkeys(

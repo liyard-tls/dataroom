@@ -63,6 +63,7 @@ import {
 } from "lucide-react";
 import { FileType } from "@/types/file.types";
 import { FileIcon } from "@/components/common/FileIcon";
+import { KbdShortcut } from "@/components/common/KbdShortcut";
 import { useUIStore } from "@/store/uiStore";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
@@ -343,6 +344,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     onDeleteSelected: handleDeleteSelected,
     onSelectAll: () => selectAll(displayedFolders.map((f) => f.id)),
     onNavigateUp: navigateUp,
+    onImportFromDrive: () => setDriveModalOpen(true),
     searchInputRef,
   });
 
@@ -574,6 +576,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               size="icon"
               className="h-8 w-8 shrink-0"
               onClick={toggleSidebar}
+              title="Toggle sidebar (Ctrl+B)"
             >
               {isSidebarCollapsed ? (
                 <PanelLeftOpen size={15} />
@@ -604,9 +607,11 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                   size="sm"
                   className="h-8 gap-1.5 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={handleDeleteSelected}
+                  title="Delete selected (Del)"
                 >
                   <Trash2 size={13} />
                   Delete
+                  <KbdShortcut keys={['delete']} />
                 </Button>
               </div>
             )}

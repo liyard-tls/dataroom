@@ -23,6 +23,7 @@ import { FileIcon } from "@/components/common/FileIcon";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { KbdShortcut } from "@/components/common/KbdShortcut";
 
 interface SidebarProps {
   folders: Folder[];
@@ -541,20 +542,22 @@ export function Sidebar({
               variant="outline"
               className="h-10 w-full justify-start rounded-lg px-3 backdrop-blur-md"
               onClick={() => uploadInputRef.current?.click()}
-              title="Upload files"
+              title="Upload files (Ctrl+U)"
             >
               <Upload size={15} className="mr-2" />
               Upload files
+              <KbdShortcut keys={["ctrl", "u"]} />
             </Button>
             {onImportFromDrive && (
               <Button
                 variant="outline"
                 className="h-10 w-full justify-start rounded-lg px-3 backdrop-blur-md"
                 onClick={onImportFromDrive}
-                title="Import from Google Drive"
+                title="Import from Google Drive (Ctrl+Shift+G)"
               >
                 <HardDriveDownload size={15} className="mr-2" />
                 Import from Drive
+                <KbdShortcut keys={["ctrl", "shift", "g"]} />
               </Button>
             )}
           </div>
@@ -616,8 +619,8 @@ export function Sidebar({
                 setIsCreatingRoot(true);
                 setRootName("");
               }}
-              className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="New folder"
+              className="flex items-center gap-1 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              title="New folder (Ctrl+Shift+F)"
             >
               <FolderPlus size={14} />
             </button>

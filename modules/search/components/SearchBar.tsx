@@ -8,6 +8,7 @@ import { useSearch } from '../hooks/useSearch'
 import { useFolderStore } from '@/store/folderStore'
 import { FileIcon } from '@/components/common/FileIcon'
 import { AnimatePresence, motion } from 'framer-motion'
+import { KbdShortcut } from '@/components/common/KbdShortcut'
 
 export const SearchBar = forwardRef<HTMLInputElement, object>(function SearchBar(_, ref) {
   const { searchQuery, setSearchQuery } = useUIStore()
@@ -38,15 +39,17 @@ export const SearchBar = forwardRef<HTMLInputElement, object>(function SearchBar
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search files and folders..."
-          className="pl-8 pr-8 text-sm"
+          className="pl-8 pr-16 text-sm"
         />
-        {searchQuery && (
+        {searchQuery ? (
           <button
             onClick={() => setSearchQuery('')}
             className="absolute right-2.5 text-muted-foreground hover:text-foreground"
           >
             <X size={14} />
           </button>
+        ) : (
+          <KbdShortcut keys={['ctrl', 'f']} className="absolute right-2.5 ml-0" />
         )}
       </div>
 
