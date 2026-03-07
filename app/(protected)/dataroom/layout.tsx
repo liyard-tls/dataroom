@@ -244,6 +244,12 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   function handleDragStart(event: DragStartEvent) {
     const id = (event.active.id as string).replace(/^main-/, "");
     setActiveDragId(id);
+    // If dragging an item that is NOT part of the current selection, deselect all
+    // so only the dragged item moves. If it IS selected, keep selection intact
+    // (all selected items will move together in handleDragEnd).
+    if (!selectedIds.has(id)) {
+      clearSelection();
+    }
   }
 
   function handleDragCancel() {
@@ -279,23 +285,31 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     }
 
     const activeId = rawActiveId;
-    const file = allFiles.find((f) => f.id === activeId);
-    const isFile = !!file;
     const isFolder = folders.some((f) => f.id === activeId);
 
-    if (isFile && file.folderId !== targetFolderId) {
-      invalidateFolderCache(file.folderId);
+    if (isFolder) {
+      // Folders always move individually
+      if (targetFolderId !== activeId && !isFolderDescendant(activeId, targetFolderId, folders)) {
+        moveFolder(activeId, targetFolderId);
+      }
+    } else {
+      // Determine which file IDs to move: if the dragged file is in the selection,
+      // move all selected files; otherwise move only the dragged file.
+      const idsToMove = selectedIds.has(activeId) && selectedIds.size > 1
+        ? Array.from(selectedIds).filter((id) => allFiles.some((f) => f.id === id))
+        : [activeId];
+
+      for (const id of idsToMove) {
+        const file = allFiles.find((f) => f.id === id);
+        if (file && file.folderId !== targetFolderId) {
+          invalidateFolderCache(file.folderId);
+          removeFile(id);
+          updateAllFile({ ...file, folderId: targetFolderId });
+          await moveFile(id, targetFolderId);
+        }
+      }
       invalidateFolderCache(targetFolderId);
-      removeFile(activeId);
-      updateAllFile({ ...file, folderId: targetFolderId });
-      await moveFile(activeId, targetFolderId);
       if (targetFolderId === currentFolderId) loadFiles();
-    } else if (
-      isFolder &&
-      targetFolderId !== activeId &&
-      !isFolderDescendant(activeId, targetFolderId, folders)
-    ) {
-      moveFolder(activeId, targetFolderId);
     }
   }
 

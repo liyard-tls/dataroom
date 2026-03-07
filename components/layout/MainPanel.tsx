@@ -137,6 +137,7 @@ function FolderRow({
   return (
     <div
       ref={setNodeRef}
+      data-item-id={folder.id}
       style={{
         transform: isDragging ? undefined : CSS.Translate.toString(transform),
         opacity: isDragging ? 0.4 : undefined,
@@ -291,6 +292,7 @@ function FileRow({
   return (
     <div
       ref={setNodeRef}
+      data-item-id={file.id}
       style={{
         transform: isDragging ? undefined : CSS.Translate.toString(transform),
         opacity: isDragging ? 0.4 : undefined,
@@ -463,6 +465,7 @@ function FolderCard({
         transform: isDragging ? undefined : CSS.Translate.toString(transform),
         opacity: isDragging ? 0.4 : undefined,
       }}
+      data-item-id={folder.id}
       className={cn(
         "group relative flex flex-col gap-2 rounded-xl border p-3 transition-colors cursor-pointer",
         isSelected ? "border-primary/40 bg-primary/10" : "border-border/60 bg-card hover:border-border hover:bg-accent/50",
@@ -587,6 +590,7 @@ function FileCard({
         transform: isDragging ? undefined : CSS.Translate.toString(transform),
         opacity: isDragging ? 0.4 : undefined,
       }}
+      data-item-id={file.id}
       className={cn(
         "group relative flex flex-col gap-2 rounded-xl border p-3 transition-colors cursor-pointer",
         isSelected ? "border-primary/40 bg-primary/10" : "border-border/60 bg-card hover:border-border hover:bg-accent/50",
@@ -738,6 +742,66 @@ export function MainPanel({
     [onUpload],
   );
 
+  // ── Rubber-band (marquee) selection ────────────────────────────────────────
+  // selBox: viewport-relative rect while dragging; null when idle.
+  const [selBox, setSelBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const selStart = useRef<{ x: number; y: number } | null>(null);
+  // Track which IDs are currently rubber-band-selected so we can diff on each move
+  const rubberSelected = useRef<Set<string>>(new Set());
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const handleContentPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      // Only left-button; skip if clicking on an interactive element
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-item-id]") || target.closest("button") || target.closest("input")) return;
+
+      e.currentTarget.setPointerCapture(e.pointerId);
+      selStart.current = { x: e.clientX, y: e.clientY };
+      rubberSelected.current = new Set();
+      setSelBox({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
+      onClearSelection();
+    },
+    [onClearSelection],
+  );
+
+  const handleContentPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!selStart.current || !contentRef.current) return;
+
+      const x1 = Math.min(selStart.current.x, e.clientX);
+      const y1 = Math.min(selStart.current.y, e.clientY);
+      const x2 = Math.max(selStart.current.x, e.clientX);
+      const y2 = Math.max(selStart.current.y, e.clientY);
+      setSelBox({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
+
+      // Find all items whose rects intersect the selection box
+      const items = contentRef.current.querySelectorAll<HTMLElement>("[data-item-id]");
+      const nowInBox = new Set<string>();
+      items.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.right > x1 && r.left < x2 && r.bottom > y1 && r.top < y2) {
+          const id = el.dataset.itemId;
+          if (id) nowInBox.add(id);
+        }
+      });
+
+      // Toggle only items whose state changed since last move
+      nowInBox.forEach((id) => { if (!rubberSelected.current.has(id)) onToggleSelect(id); });
+      rubberSelected.current.forEach((id) => { if (!nowInBox.has(id)) onToggleSelect(id); });
+      rubberSelected.current = nowInBox;
+    },
+    [onToggleSelect],
+  );
+
+  const handleContentPointerUp = useCallback(() => {
+    selStart.current = null;
+    rubberSelected.current = new Set();
+    setSelBox(null);
+  }, []);
+  // ──────────────────────────────────────────────────────────────────────────
+
   return (
     <div
       ref={setNodeRef}
@@ -787,7 +851,20 @@ export function MainPanel({
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div
+        ref={contentRef}
+        className="relative flex-1 overflow-y-auto py-2 select-none"
+        onPointerDown={handleContentPointerDown}
+        onPointerMove={handleContentPointerMove}
+        onPointerUp={handleContentPointerUp}
+      >
+        {/* Rubber-band selection rectangle — fixed so it stays in viewport during scroll */}
+        {selBox && selBox.w > 2 && selBox.h > 2 && (
+          <div
+            className="pointer-events-none fixed z-50 rounded border border-primary/60 bg-primary/10"
+            style={{ left: selBox.x, top: selBox.y, width: selBox.w, height: selBox.h }}
+          />
+        )}
         {isLoading && (
           <div className="flex h-32 items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
