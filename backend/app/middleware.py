@@ -13,6 +13,9 @@ def require_owner(f):
     """Decorator that extracts and validates X-Owner-ID header."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        # CORS preflight — let flask-cors handle it
+        if request.method == "OPTIONS":
+            return f(*args, **kwargs)
         owner_id = request.headers.get("X-Owner-ID", "").strip()
         if not owner_id:
             return jsonify({"error": "X-Owner-ID header is required"}), 401

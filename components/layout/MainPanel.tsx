@@ -11,6 +11,7 @@ import {
   Pencil,
   Eye,
   Star,
+  Link,
 } from "lucide-react";
 import { FileMetadata } from "@/types/file.types";
 import { Folder } from "@/types/folder.types";
@@ -53,6 +54,8 @@ interface MainPanelProps {
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
   viewMode: "list" | "grid";
+  onShareFile: (id: string) => void;
+  onShareFolder: (id: string) => void;
 }
 
 // Shared column widths — identical in header and every row
@@ -99,6 +102,7 @@ function FolderRow({
   onRename,
   onDelete,
   onToggleFavorite,
+  onShare,
 }: {
   folder: Folder;
   isNotEmpty: boolean;
@@ -109,6 +113,7 @@ function FolderRow({
   onRename: (name: string) => void;
   onDelete: () => void;
   onToggleFavorite: () => void;
+  onShare: () => void;
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(folder.name);
@@ -225,6 +230,7 @@ function FolderRow({
               size="icon"
               className="h-7 w-7"
               onClick={stopRowPropagation}
+              onPointerDown={stopRowPropagation}
               onDoubleClick={stopRowPropagation}
             >
               <MoreHorizontal size={15} />
@@ -245,6 +251,9 @@ function FolderRow({
             <DropdownMenuItem onClick={onToggleFavorite}>
               <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
               {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onShare}>
+              <Link size={14} className="mr-2" /> Share
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -269,6 +278,7 @@ function FileRow({
   onRename,
   onDelete,
   onToggleFavorite,
+  onShare,
 }: {
   file: FileMetadata;
   isSelected: boolean;
@@ -278,6 +288,7 @@ function FileRow({
   onRename: (name: string) => void;
   onDelete: () => void;
   onToggleFavorite: () => void;
+  onShare: () => void;
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(file.name);
@@ -379,6 +390,7 @@ function FileRow({
               size="icon"
               className="h-7 w-7"
               onClick={stopRowPropagation}
+              onPointerDown={stopRowPropagation}
               onDoubleClick={stopRowPropagation}
             >
               <MoreHorizontal size={15} />
@@ -399,6 +411,9 @@ function FileRow({
             <DropdownMenuItem onClick={onToggleFavorite}>
               <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
               {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onShare}>
+              <Link size={14} className="mr-2" /> Share
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -424,6 +439,7 @@ function FolderCard({
   onRename,
   onDelete,
   onToggleFavorite,
+  onShare,
 }: {
   folder: Folder;
   isNotEmpty: boolean;
@@ -434,6 +450,7 @@ function FolderCard({
   onRename: (name: string) => void;
   onDelete: () => void;
   onToggleFavorite: () => void;
+  onShare: () => void;
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(folder.name);
@@ -497,7 +514,7 @@ function FolderCard({
         </button>
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onDoubleClick={stopRowPropagation}>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
               <MoreHorizontal size={13} />
             </Button>
           </DropdownMenuTrigger>
@@ -509,6 +526,9 @@ function FolderCard({
             <DropdownMenuItem onClick={onToggleFavorite}>
               <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
               {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onShare}>
+              <Link size={14} className="mr-2" /> Share
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
@@ -563,6 +583,7 @@ function FileCard({
   onRename,
   onDelete,
   onToggleFavorite,
+  onShare,
 }: {
   file: FileMetadata;
   isSelected: boolean;
@@ -572,6 +593,7 @@ function FileCard({
   onRename: (name: string) => void;
   onDelete: () => void;
   onToggleFavorite: () => void;
+  onShare: () => void;
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(file.name);
@@ -621,7 +643,7 @@ function FileCard({
         </button>
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onDoubleClick={stopRowPropagation}>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
               <MoreHorizontal size={13} />
             </Button>
           </DropdownMenuTrigger>
@@ -633,6 +655,9 @@ function FileCard({
             <DropdownMenuItem onClick={onToggleFavorite}>
               <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
               {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onShare}>
+              <Link size={14} className="mr-2" /> Share
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
@@ -704,6 +729,8 @@ export function MainPanel({
   onToggleFavorite,
   viewMode,
   childFolders,
+  onShareFile,
+  onShareFolder,
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -756,6 +783,8 @@ export function MainPanel({
       if (e.button !== 0) return;
       const target = e.target as HTMLElement;
       if (target.closest("[data-item-id]") || target.closest("button") || target.closest("input")) return;
+      // Skip if any Radix dropdown/menu is currently open (portal renders outside contentRef)
+      if (document.querySelector('[role="menu"]')) return;
 
       e.currentTarget.setPointerCapture(e.pointerId);
       selStart.current = { x: e.clientX, y: e.clientY };
@@ -891,6 +920,7 @@ export function MainPanel({
                 onRename={(name) => onFolderRename(folder.id, name)}
                 onDelete={() => onFolderDelete(folder.id)}
                 onToggleFavorite={() => onToggleFavorite(folder.id)}
+                onShare={() => onShareFolder(folder.id)}
               />
             ))}
             {files.map((file) => (
@@ -904,6 +934,7 @@ export function MainPanel({
                 onRename={(name) => onRenameFile(file.id, name)}
                 onDelete={() => onDeleteFile(file.id)}
                 onToggleFavorite={() => onToggleFavorite(file.id)}
+                onShare={() => onShareFile(file.id)}
               />
             ))}
           </>
@@ -926,6 +957,7 @@ export function MainPanel({
                 onRename={(name) => onFolderRename(folder.id, name)}
                 onDelete={() => onFolderDelete(folder.id)}
                 onToggleFavorite={() => onToggleFavorite(folder.id)}
+                onShare={() => onShareFolder(folder.id)}
               />
             ))}
             {files.map((file) => (
@@ -939,6 +971,7 @@ export function MainPanel({
                 onRename={(name) => onRenameFile(file.id, name)}
                 onDelete={() => onDeleteFile(file.id)}
                 onToggleFavorite={() => onToggleFavorite(file.id)}
+                onShare={() => onShareFile(file.id)}
               />
             ))}
           </div>

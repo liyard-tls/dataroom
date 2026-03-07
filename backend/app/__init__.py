@@ -15,10 +15,15 @@ def create_app(env: str | None = None) -> Flask:
     # Extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    frontend_url = app.config["FRONTEND_URL"]
     cors.init_app(
         app,
-        resources={r"/*": {"origins": app.config["FRONTEND_URL"]}},
-        supports_credentials=True,
+        resources={
+            # Public share endpoints — allow any origin, no credentials
+            r"/public/*": {"origins": "*"},
+            # All other endpoints — locked to the frontend origin with credentials
+            r"/*": {"origins": frontend_url, "supports_credentials": True},
+        },
     )
 
     # Register blueprints
@@ -27,12 +32,16 @@ def create_app(env: str | None = None) -> Flask:
     from .routes.folders import folders_bp
     from .routes.gdrive import gdrive_bp
     from .routes.search import search_bp
+    from .routes.shares import shares_bp
+    from .routes.public import public_bp
 
     app.register_blueprint(oauth_bp, url_prefix="/oauth")
     app.register_blueprint(files_bp, url_prefix="/files")
     app.register_blueprint(folders_bp, url_prefix="/folders")
     app.register_blueprint(gdrive_bp, url_prefix="/gdrive")
     app.register_blueprint(search_bp, url_prefix="/search")
+    app.register_blueprint(shares_bp, url_prefix="/shares")
+    app.register_blueprint(public_bp, url_prefix="/public")
 
     @app.get("/health")
     def health():

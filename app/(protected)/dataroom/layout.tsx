@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { Folder } from "@/types/folder.types";
 import { resolveFolderPath, useFolderNavigation } from "@/hooks/useFolderPath";
 import { invalidateFolderCache, invalidateAllFolderCache } from "@/modules/files/hooks/useFiles";
+import { ShareModal } from "@/modules/sharing/components/ShareModal";
 
 function isFolderDescendant(
   folderId: string,
@@ -91,6 +92,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [driveModalOpen, setDriveModalOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState<{ type: "file" | "folder"; id: string; name: string } | null>(null);
   const [sortField, setSortField] = useState<"name" | "size" | "updatedAt">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterTypes, setFilterTypes] = useState<Set<FileType | "folder">>(new Set());
@@ -497,6 +499,14 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               favoriteIds={favoriteIds}
               onToggleFavorite={toggleFavorite}
               viewMode={viewMode}
+              onShareFile={(id) => {
+                const file = allFiles.find((f) => f.id === id);
+                if (file) setShareTarget({ type: "file", id, name: file.name });
+              }}
+              onShareFolder={(id) => {
+                const folder = folders.find((f) => f.id === id);
+                if (folder) setShareTarget({ type: "folder", id, name: folder.name });
+              }}
             />
           </main>
         </div>
@@ -519,6 +529,14 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
 
       <ViewerModal />
       <UploadProgressPanel />
+      {shareTarget && (
+        <ShareModal
+          resourceType={shareTarget.type}
+          resourceId={shareTarget.id}
+          resourceName={shareTarget.name}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
       {driveModalOpen && (
         <GoogleDriveModal
           currentFolderId={currentFolderId}

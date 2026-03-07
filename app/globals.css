@@ -130,6 +130,14 @@
   }
 }
 
+/* Prevent Radix Dialog from injecting margin/padding compensation.
+   Body already has overflow:hidden so there is no scrollbar to compensate for.
+   Must be outside @layer to win specificity over Radix injected <style> tags. */
+body[data-scroll-locked] {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
 /* Thin, themed scrollbar — outside @layer so pseudo-elements are not filtered */
 ::-webkit-scrollbar {
   width: 5px;
