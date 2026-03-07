@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Space_Grotesk } from 'next/font/google'
 import './globals.css'
+import './react-pdf-layers.css'
 import { Providers } from './providers'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
