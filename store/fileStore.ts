@@ -4,12 +4,17 @@ import { FileMetadata } from '@/types/file.types'
 interface FileState {
   // Files for the currently open folder (metadata only — no blobs)
   files: FileMetadata[]
+  // All files across all folders — used by Sidebar and DnD. Persists across folder navigation.
+  allFiles: FileMetadata[]
   // IDs of selected files for bulk operations
   selectedIds: Set<string>
   isLoading: boolean
   error: string | null
 
   setFiles: (files: FileMetadata[]) => void
+  setAllFiles: (files: FileMetadata[]) => void
+  updateAllFile: (updated: FileMetadata) => void
+  removeAllFile: (id: string) => void
   addFile: (file: FileMetadata) => void
   updateFile: (updated: FileMetadata) => void
   removeFile: (id: string) => void
@@ -23,11 +28,19 @@ interface FileState {
 
 export const useFileStore = create<FileState>()((set) => ({
   files: [],
+  allFiles: [],
   selectedIds: new Set(),
   isLoading: false,
   error: null,
 
   setFiles: (files) => set({ files, selectedIds: new Set() }),
+  setAllFiles: (allFiles) => set({ allFiles }),
+  updateAllFile: (updated) =>
+    set((state) => ({
+      allFiles: state.allFiles.map((f) => (f.id === updated.id ? updated : f)),
+    })),
+  removeAllFile: (id) =>
+    set((state) => ({ allFiles: state.allFiles.filter((f) => f.id !== id) })),
   addFile: (file) => set((state) => ({ files: [...state.files, file] })),
   updateFile: (updated) =>
     set((state) => ({

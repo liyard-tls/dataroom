@@ -703,11 +703,6 @@ export function MainPanel({
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // DEBUG: log every render with loading state
-  const renderCount = useRef(0)
-  renderCount.current += 1
-  console.log(`[MainPanel] render #${renderCount.current} isLoading=${isLoading} files=${files.length} folders=${childFolders.length} folderId=${currentFolderId}`)
-
   const { setNodeRef, isOver: isDndOver } = useDroppable({
     id: "main-panel",
     data: { folderId: currentFolderId },

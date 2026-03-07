@@ -46,8 +46,10 @@ export function useFiles(folderId: string | null) {
     const requestFolderId = folderId
     currentFolderRef.current = requestFolderId
 
+    // If we have cached data for this folder, show it immediately and refresh in background
+    // (no loading spinner — transition feels instant).
+    // Without cache, clear stale files and show spinner while fetching.
     const cached = folderCache.get(cacheKey(requestFolderId))
-    console.log('[loadFiles] folderId=', requestFolderId, 'hasCached=', !!cached, 'cachedCount=', cached?.length)
     if (cached) {
       setFiles(cached)
       // setLoading stays false — background refresh, no spinner
@@ -57,9 +59,7 @@ export function useFiles(folderId: string | null) {
     }
 
     try {
-      const t0 = performance.now()
       const data = await fileService.getFiles(requestFolderId)
-      console.log('[loadFiles] fetch done in', Math.round(performance.now() - t0), 'ms, folderId=', requestFolderId, 'count=', data.length, 'stale=', currentFolderRef.current !== requestFolderId)
       // Guard: discard stale response if folderId changed while request was in-flight
       if (currentFolderRef.current !== requestFolderId) {
         return
