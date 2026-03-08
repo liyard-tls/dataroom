@@ -2,8 +2,11 @@
 
 /**
  * Sharing service — communicates with Flask /shares and /public endpoints.
- * Uses X-Owner-ID for authenticated requests; public endpoints need no auth.
+ * Authenticated requests use Authorization: Bearer <Firebase ID token>.
+ * Public endpoints (/public/*) need no auth.
  */
+
+import { getIdToken } from '@/config/firebase.config'
 
 export interface ShareLink {
   id: string
@@ -30,14 +33,16 @@ const BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5001'
 let _ownerId = ''
 export function setSharingOwnerId(uid: string) { _ownerId = uid }
 
-function authHeaders(): HeadersInit {
-  return { 'Content-Type': 'application/json', 'X-Owner-ID': _ownerId }
+async function authHeaders(): Promise<HeadersInit> {
+  const token = await getIdToken()
+  if (!token) throw new Error('Not authenticated.')
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
-    headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+    headers: { ...(await authHeaders()), ...(init?.headers ?? {}) },
     credentials: 'include',
   })
   if (!res.ok) {

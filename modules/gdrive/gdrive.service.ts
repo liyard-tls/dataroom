@@ -10,19 +10,23 @@
  *   POST /gdrive/import                — import selected files
  */
 
+import { getIdToken } from '@/config/firebase.config'
+
 const BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5001').replace(/\/$/, '')
 
 let _ownerId = ''
 export function setGDriveOwnerId(uid: string) { _ownerId = uid }
 
-function headers(): HeadersInit {
-  return { 'Content-Type': 'application/json', 'X-Owner-ID': _ownerId }
+async function authHeaders(): Promise<HeadersInit> {
+  const token = await getIdToken()
+  if (!token) throw new Error('Not authenticated.')
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
-    headers: { ...headers(), ...(init?.headers ?? {}) },
+    headers: { ...(await authHeaders()), ...(init?.headers ?? {}) },
     credentials: 'include',
   })
   if (!res.ok) {

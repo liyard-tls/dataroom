@@ -5,14 +5,18 @@
  *
  * Usage: set NEXT_PUBLIC_STORAGE_ADAPTER=flask in .env.local
  *
- * Auth: Every request carries the Firebase UID in the X-Owner-ID header.
- * The owner_id is injected via setOwnerId() once the user is authenticated.
+ * Auth: Every request carries a Firebase ID token in the Authorization header
+ * (Bearer scheme).  The token is fetched fresh before each request so it is
+ * always valid (Firebase auto-refreshes tokens that are about to expire).
+ * setOwnerId() is still called for the isOwnerIdSet() guard — it no longer
+ * affects the actual auth header.
  *
  * File blobs: The backend stores files on disk and serves them via
  * GET /files/:id/view. getFileById() fetches the blob from that endpoint
  * and wraps it in a FileRecord compatible with the existing viewer code.
  */
 
+import { getIdToken } from '@/config/firebase.config'
 import { StorageAdapter } from '../interface/storage.interface'
 import { Folder, FolderCreateInput, FolderUpdateInput } from '@/types/folder.types'
 import { FileRecord, FileCreateInput, FileMetadata, FileUpdateInput, MIME_TO_FILE_TYPE } from '@/types/file.types'
@@ -26,7 +30,7 @@ const BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5001'
 
 let _ownerId = ''
 
-/** Must be called after user signs in. Sets the owner ID sent with every request. */
+/** Must be called after user signs in. Used only as an "authenticated" guard. */
 export function setOwnerId(uid: string) {
   _ownerId = uid
 }
@@ -36,10 +40,13 @@ export function isOwnerIdSet(): boolean {
   return !!_ownerId
 }
 
-function headers(): HeadersInit {
+/** Returns auth headers with a fresh Firebase ID token. */
+async function authHeaders(): Promise<HeadersInit> {
+  const token = await getIdToken()
+  if (!token) throw new Error('Not authenticated — no Firebase ID token available.')
   return {
     'Content-Type': 'application/json',
-    'X-Owner-ID': _ownerId,
+    Authorization: `Bearer ${token}`,
   }
 }
 
@@ -47,7 +54,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
-      ...headers(),
+      ...(await authHeaders()),
       ...(init?.headers ?? {}),
     },
     credentials: 'include',
@@ -99,7 +106,6 @@ export class FlaskApiAdapter implements StorageAdapter {
 
   async getFolderTree(_ownerId: string): Promise<Folder[]> {
     if (!_ownerId) return []
-    // ownerId is sent via X-Owner-ID header; the param is ignored server-side
     const raw = await apiFetch<Record<string, unknown>[]>('/folders/')
     return raw.map(parseFolder)
   }
@@ -166,9 +172,9 @@ export class FlaskApiAdapter implements StorageAdapter {
       const meta = await apiFetch<Record<string, unknown>>(`/files/${id}`)
       const metadata = parseFileMetadata(meta)
 
-      // Fetch binary content for the viewer
+      const token = await getIdToken()
       const blobRes = await fetch(`${BASE_URL}/files/${id}/view`, {
-        headers: { 'X-Owner-ID': _ownerId },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: 'include',
       })
       if (!blobRes.ok) return null
@@ -181,14 +187,16 @@ export class FlaskApiAdapter implements StorageAdapter {
   }
 
   async createFile(input: FileCreateInput): Promise<FileRecord> {
-    // Upload file as multipart form data
     const form = new FormData()
     form.append('file', input.blob as Blob, input.name)
     if (input.folderId) form.append('folder_id', input.folderId)
 
+    const token = await getIdToken()
+    if (!token) throw new Error('Not authenticated.')
+
     const res = await fetch(`${BASE_URL}/files/upload`, {
       method: 'POST',
-      headers: { 'X-Owner-ID': _ownerId },
+      headers: { Authorization: `Bearer ${token}` },
       body: form,
       credentials: 'include',
     })
@@ -210,9 +218,9 @@ export class FlaskApiAdapter implements StorageAdapter {
     })
     const metadata = parseFileMetadata(raw)
 
-    // Re-fetch blob so the return value is a valid FileRecord
+    const token = await getIdToken()
     const blobRes = await fetch(`${BASE_URL}/files/${id}/view`, {
-      headers: { 'X-Owner-ID': _ownerId },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: 'include',
     })
     const blob = blobRes.ok ? await blobRes.blob() : new Blob()

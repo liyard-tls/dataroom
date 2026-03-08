@@ -20,6 +20,13 @@ class Config:
     # Token encryption
     FERNET_KEY = os.environ.get("FERNET_KEY")  # Required in production
 
+    # Firebase Admin SDK — full service-account JSON as a single-line string.
+    # When set, every request must carry Authorization: Bearer <id-token>.
+    # When absent, the legacy X-Owner-ID fallback is used (dev only).
+    FIREBASE_SERVICE_ACCOUNT_JSON = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+    # Set to "true" to reject X-Owner-ID fallback even in development.
+    FIREBASE_AUTH_REQUIRED = os.environ.get("FIREBASE_AUTH_REQUIRED", "false")
+
     # Google OAuth
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")

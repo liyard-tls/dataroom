@@ -28,3 +28,46 @@ export function getFirebaseAuth(): Auth {
   }
   return _auth
 }
+
+/**
+ * Returns a fresh Firebase ID token for the currently signed-in user.
+ * Waits up to 5 seconds for Firebase to restore a persisted session before
+ * giving up — this prevents a race condition where currentUser is null on
+ * the first render tick while Firebase is still reading from IndexedDB/localStorage.
+ * Returns null if no user is signed in.
+ */
+export async function getIdToken(): Promise<string | null> {
+  const auth = getFirebaseAuth()
+
+  // Fast path — user already resolved (common case after first load)
+  if (auth.currentUser) {
+    return auth.currentUser.getIdToken()
+  }
+
+  // Wait for Firebase to restore the persisted session (max 5 s)
+  return new Promise((resolve) => {
+    const TIMEOUT = 5_000
+    let settled = false
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true
+        unsubscribe()
+        resolve(null)
+      }
+    }, TIMEOUT)
+
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!settled) {
+        settled = true
+        clearTimeout(timer)
+        unsubscribe()
+        if (user) {
+          user.getIdToken().then(resolve).catch(() => resolve(null))
+        } else {
+          resolve(null)
+        }
+      }
+    })
+  })
+}

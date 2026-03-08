@@ -22,7 +22,13 @@ def create_app(env: str | None = None) -> Flask:
             # Public share endpoints — allow any origin, no credentials
             r"/public/*": {"origins": "*"},
             # All other endpoints — locked to the frontend origin with credentials
-            r"/*": {"origins": frontend_url, "supports_credentials": True},
+            r"/*": {
+                "origins": frontend_url,
+                "supports_credentials": True,
+                # Allow the Authorization header so Bearer tokens pass CORS preflight
+                "allow_headers": ["Content-Type", "Authorization", "X-Owner-ID"],
+                "expose_headers": ["Content-Disposition"],
+            },
         },
     )
 
