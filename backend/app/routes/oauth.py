@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
 import requests
-from flask import Blueprint, current_app, g, jsonify, redirect, request, session
+from flask import Blueprint, current_app, g, jsonify, request, session
 
 from ..middleware import require_owner
 from ..services import token_service
@@ -56,20 +56,43 @@ def callback():
     Exchanges the authorization code for tokens and saves them encrypted.
     Then redirects the user back to the frontend.
     """
+    frontend_url = current_app.config["FRONTEND_URL"]
+
+    def popup_response(msg_type: str, payload: dict | None = None):
+        """Return an HTML page that posts a message to the opener and closes."""
+        import json as _json
+        data = _json.dumps({"type": msg_type, **(payload or {})})
+        fallback = frontend_url + "/dataroom"
+        return f"""<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Google Drive</title></head>
+<body>
+<script>
+  if (window.opener) {{
+    window.opener.postMessage({data}, {repr(frontend_url)});
+    window.close();
+  }} else {{
+    window.location.href = {repr(fallback)};
+  }}
+</script>
+<p>You can close this window.</p>
+</body>
+</html>"""
+
     error = request.args.get("error")
     if error:
-        return redirect(f"{current_app.config['FRONTEND_URL']}?gdrive_error={error}")
+        return popup_response("gdrive_error", {"error": error})
 
     code = request.args.get("code")
     state = request.args.get("state")
 
     # CSRF check
     if not state or state != session.get("oauth_state"):
-        return redirect(f"{current_app.config['FRONTEND_URL']}?gdrive_error=state_mismatch")
+        return popup_response("gdrive_error", {"error": "state_mismatch"})
 
     owner_id = session.get("oauth_owner_id")
     if not owner_id:
-        return redirect(f"{current_app.config['FRONTEND_URL']}?gdrive_error=missing_owner")
+        return popup_response("gdrive_error", {"error": "missing_owner"})
 
     # Exchange code for tokens
     resp = requests.post(
@@ -85,7 +108,7 @@ def callback():
     )
 
     if not resp.ok:
-        return redirect(f"{current_app.config['FRONTEND_URL']}?gdrive_error=token_exchange_failed")
+        return popup_response("gdrive_error", {"error": "token_exchange_failed"})
 
     data = resp.json()
     access_token = data["access_token"]
@@ -106,7 +129,7 @@ def callback():
     session.pop("oauth_state", None)
     session.pop("oauth_owner_id", None)
 
-    return redirect(f"{current_app.config['FRONTEND_URL']}?gdrive_connected=true")
+    return popup_response("gdrive_connected")
 
 
 @oauth_bp.get("/google-drive/status")

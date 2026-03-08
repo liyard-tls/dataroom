@@ -98,24 +98,24 @@ export function GoogleDriveModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDriveFolderId, typeFilter, debouncedSearch]);
 
+  // Listen for postMessage from the OAuth popup
   useEffect(() => {
-    if (!oauthWindowRef.current) return;
-    const interval = setInterval(() => {
-      try {
-        if (oauthWindowRef.current?.closed) {
-          clearInterval(interval);
-          oauthWindowRef.current = null;
-          gdriveService
-            .getStatus()
-            .then(setStatus)
-            .catch(() => {});
-        }
-      } catch {
-        /* cross-origin — ignore */
+    function onMessage(e: MessageEvent) {
+      const backendOrigin = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5001').replace(/\/$/, '')
+      // Accept messages only from the current frontend origin (popup posts to opener)
+      // The backend HTML posts to FRONTEND_URL so the origin will be the backend.
+      if (e.origin !== window.location.origin && e.origin !== new URL(backendOrigin).origin) return
+      if (e.data?.type === 'gdrive_connected') {
+        oauthWindowRef.current = null
+        gdriveService.getStatus().then(setStatus).catch(() => {})
+      } else if (e.data?.type === 'gdrive_error') {
+        oauthWindowRef.current = null
+        setError(`Google Drive error: ${e.data.error ?? 'unknown'}`)
       }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [oauthWindowRef.current]); // eslint-disable-line react-hooks/exhaustive-deps
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
 
   async function loadItems(pageToken?: string) {
     setLoadingFiles(true);

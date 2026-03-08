@@ -77,6 +77,7 @@ import {
 import { uniqueName } from "@/lib/fileHelpers";
 import { ShareModal } from "@/modules/sharing/components/ShareModal";
 import { sharingService } from "@/modules/sharing";
+import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 
 function isFolderDescendant(
   folderId: string,
@@ -134,6 +135,13 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     id: string;
     name: string;
   } | null>(null);
+
+  // Pending delete — shows confirm dialog before executing
+  type PendingDelete =
+    | { kind: "file"; id: string; name: string }
+    | { kind: "folder"; id: string; name: string }
+    | { kind: "selected"; count: number }
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
 
   const loadSharedIds = useCallback(async () => {
     try {
@@ -368,6 +376,33 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     [deleteFolder, removeSelectedIds],
   );
 
+  // Wrappers that open the confirm dialog instead of deleting immediately
+  const requestDeleteFile = useCallback((id: string) => {
+    const file = allFiles.find((f) => f.id === id)
+    setPendingDelete({ kind: "file", id, name: file?.name ?? "this file" })
+  }, [allFiles])
+
+  const requestDeleteFolder = useCallback((id: string) => {
+    const folder = folders.find((f) => f.id === id)
+    setPendingDelete({ kind: "folder", id, name: folder?.name ?? "this folder" })
+  }, [folders])
+
+  const requestDeleteSelected = useCallback(() => {
+    setPendingDelete({ kind: "selected", count: selectedIds.size })
+  }, [selectedIds.size])
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) return
+    setPendingDelete(null)
+    if (pendingDelete.kind === "file") {
+      await handleDeleteFile(pendingDelete.id)
+    } else if (pendingDelete.kind === "folder") {
+      await handleDeleteFolder(pendingDelete.id)
+    } else {
+      await handleDeleteSelected()
+    }
+  }, [pendingDelete, handleDeleteFile, handleDeleteFolder, handleDeleteSelected])
+
   const navigateUp = useCallback(() => {
     const current = folders.find((f) => f.id === currentFolderId);
     if (!current) return;
@@ -425,7 +460,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   useGlobalHotkeys({
     onUpload: () => uploadInputRef.current?.click(),
     onCreateFolder: handleCreateFolderInCurrent,
-    onDeleteSelected: handleDeleteSelected,
+    onDeleteSelected: requestDeleteSelected,
     onSelectAll: () => selectAll(displayedFolders.map((f) => f.id)),
     onNavigateUp: navigateUp,
     onImportFromDrive: () => setDriveModalOpen(true),
@@ -644,7 +679,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               void handleRenameFolder(id, name);
             }}
             onDeleteFolder={(id) => {
-              void handleDeleteFolder(id);
+              requestDeleteFolder(id);
             }}
             user={user}
             files={allFiles}
@@ -695,7 +730,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                   variant="outline"
                   size="sm"
                   className="h-8 gap-1.5 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={handleDeleteSelected}
+                  onClick={requestDeleteSelected}
                   title="Delete selected (Del)"
                 >
                   <Trash2 size={13} />
@@ -885,15 +920,15 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               onNavigate={navigate}
               onOpenFile={openFile}
               onRenameFile={renameFile}
-              onDeleteFile={handleDeleteFile}
-              onDeleteSelected={handleDeleteSelected}
+              onDeleteFile={requestDeleteFile}
+              onDeleteSelected={requestDeleteSelected}
               onUpload={handleUploadFiles}
               onFolderOpen={navigate}
               onFolderRename={(id, name) => {
                 void handleRenameFolder(id, name);
               }}
               onFolderDelete={(id) => {
-                void handleDeleteFolder(id);
+                requestDeleteFolder(id);
               }}
               onFolderCreate={(name, parentId) => {
                 void handleCreateFolder(name, parentId, { startRenaming: true });
@@ -967,6 +1002,21 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
           onClose={() => { setShareTarget(null); void loadSharedIds(); }}
         />
       )}
+      <ConfirmDeleteDialog
+        open={!!pendingDelete}
+        description={
+          pendingDelete?.kind === "file" ? (
+            <>Delete <strong>&ldquo;{pendingDelete.name}&rdquo;</strong>? This cannot be undone.</>
+          ) : pendingDelete?.kind === "folder" ? (
+            <>Delete folder <strong>&ldquo;{pendingDelete.name}&rdquo;</strong> and all its contents? This cannot be undone.</>
+          ) : (
+            <>Delete <strong>{pendingDelete?.count} item{pendingDelete?.count !== 1 ? "s" : ""}</strong>? This cannot be undone.</>
+          )
+        }
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      />
+
       {pendingMove && (
         <Dialog
           open
