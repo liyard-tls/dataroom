@@ -54,6 +54,7 @@ import {
   PanelLeftClose,
   Download,
   Trash2,
+  FolderPlus,
   LayoutGrid,
   List,
   ArrowUpDown,
@@ -295,16 +296,37 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   );
 
   const handleCreateFolder = useCallback(
-    async (name: string, parentId: string | null = null) => {
+    async (
+      name: string,
+      parentId: string | null = null,
+      options: { startRenaming?: boolean } = {},
+    ) => {
       const siblings = folders
         .filter((f) => f.parentId === parentId)
         .map((f) => f.name);
       const resolvedName = uniqueName(name, siblings);
       const folder = await createFolder(resolvedName, parentId);
-      if (folder) setCreatingFolderId(folder.id);
+      if (folder && options.startRenaming) setCreatingFolderId(folder.id);
       return folder;
     },
     [createFolder, folders],
+  );
+
+  const handleRenameFolder = useCallback(
+    async (id: string, name: string) => {
+      const desiredName = name.trim();
+      if (!desiredName) return;
+
+      const current = folders.find((f) => f.id === id);
+      if (!current) return;
+
+      const siblingNames = folders
+        .filter((f) => f.parentId === current.parentId && f.id !== id)
+        .map((f) => f.name);
+      const resolvedName = uniqueName(desiredName, siblingNames);
+      await renameFolder(id, resolvedName);
+    },
+    [folders, renameFolder],
   );
 
   const handleDeleteFile = useCallback(
@@ -385,9 +407,13 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     });
   }, [folders, currentFolderId, sortField, sortDir, filterTypes]);
 
+  const handleCreateFolderInCurrent = useCallback(() => {
+    void handleCreateFolder("New Folder", currentFolderId, { startRenaming: true });
+  }, [handleCreateFolder, currentFolderId]);
+
   useGlobalHotkeys({
     onUpload: () => uploadInputRef.current?.click(),
-    onCreateFolder: () => void handleCreateFolder("New Folder", currentFolderId),
+    onCreateFolder: handleCreateFolderInCurrent,
     onDeleteSelected: handleDeleteSelected,
     onSelectAll: () => selectAll(displayedFolders.map((f) => f.id)),
     onNavigateUp: navigateUp,
@@ -600,8 +626,12 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
             folders={folders}
             currentFolderId={currentFolderId}
             onNavigate={navigate}
-            onCreateFolder={handleCreateFolder}
-            onRenameFolder={renameFolder}
+            onCreateFolder={(name, parentId) => {
+              void handleCreateFolder(name, parentId, { startRenaming: false });
+            }}
+            onRenameFolder={(id, name) => {
+              void handleRenameFolder(id, name);
+            }}
             onDeleteFolder={async (id) => {
               invalidateAllFolderCache();
               await deleteFolder(id);
@@ -664,6 +694,17 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                 </Button>
               </div>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-muted-foreground"
+              onClick={handleCreateFolderInCurrent}
+              title="New folder (Ctrl+Shift+F)"
+            >
+              <FolderPlus size={13} />
+              New Folder
+              <KbdShortcut keys={["ctrl", "shift", "f"]} />
+            </Button>
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -835,12 +876,16 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               onDeleteSelected={handleDeleteSelected}
               onUpload={handleUploadFiles}
               onFolderOpen={navigate}
-              onFolderRename={(id, name) => renameFolder(id, name)}
+              onFolderRename={(id, name) => {
+                void handleRenameFolder(id, name);
+              }}
               onFolderDelete={async (id) => {
                 invalidateAllFolderCache();
                 await deleteFolder(id);
               }}
-              onFolderCreate={handleCreateFolder}
+              onFolderCreate={(name, parentId) => {
+                void handleCreateFolder(name, parentId, { startRenaming: true });
+              }}
               onToggleSelect={toggleSelection}
               onSelectAll={selectAll}
               onClearSelection={clearSelection}
