@@ -83,6 +83,7 @@ function FileSharePage({ info, token }: { info: ShareInfo; token: string }) {
           <h1 className="truncate font-semibold text-base">{file.name}</h1>
           <p className="text-xs text-muted-foreground">
             {formatFileSize(file.size)} · {formatModifiedDate(new Date(file.updatedAt))}
+            {info.share.ownerName && <> · shared by <span className="text-foreground">{info.share.ownerName}</span></>}
           </p>
         </div>
         <ThemeToggle />
@@ -153,6 +154,7 @@ function FolderSharePage({ info, token }: { info: ShareInfo; token: string }) {
           <h1 className="truncate font-semibold text-base">{rootFolder.name}</h1>
           <p className="text-xs text-muted-foreground">
             {folders.length} folder{folders.length !== 1 ? 's' : ''} · {files.length} file{files.length !== 1 ? 's' : ''}
+            {info.share.ownerName && <> · shared by <span className="text-foreground">{info.share.ownerName}</span></>}
           </p>
         </div>
         <ThemeToggle />

@@ -48,6 +48,17 @@ def require_owner(f):
 
             if uid is not None:
                 g.owner_id = uid
+                # Best-effort: extract email from JWT payload for display purposes.
+                # This works in both dev (unverified decode) and prod (already verified above).
+                try:
+                    import base64, json as _json
+                    payload_b64 = id_token.split(".")[1]
+                    payload_b64 += "=" * (4 - len(payload_b64) % 4)
+                    payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
+                    # Use display name only (Google/Apple) — no email exposed
+                    g.owner_name = payload.get("name") or None
+                except Exception:
+                    g.owner_name = None
                 return f(*args, **kwargs)
 
             # Token present but invalid / expired
@@ -62,6 +73,7 @@ def require_owner(f):
                 owner_id,
             )
             g.owner_id = owner_id
+            g.owner_name = None
             return f(*args, **kwargs)
 
         return jsonify({"error": "Authentication required."}), 401

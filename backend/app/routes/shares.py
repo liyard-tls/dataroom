@@ -47,6 +47,7 @@ def create_share():
         resource_type=resource_type,
         resource_id=resource_id,
         owner_id=g.owner_id,
+        owner_name=getattr(g, "owner_name", None),
         expires_at=expires_at,
     )
     db.session.add(share)

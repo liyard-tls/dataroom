@@ -16,6 +16,8 @@ class ShareLink(db.Model):
     resource_type = db.Column(db.String(10), nullable=False)  # 'file' | 'folder'
     resource_id = db.Column(db.String(36), nullable=False)
     owner_id = db.Column(db.Text, nullable=False, index=True)
+    # Display name shown to public viewers of the share link (optional)
+    owner_name = db.Column(db.Text, nullable=True)
     # NULL = never expires; set by owner to revoke on a date
     expires_at = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=_now, nullable=False)
@@ -32,6 +34,7 @@ class ShareLink(db.Model):
             "resourceType": self.resource_type,
             "resourceId": self.resource_id,
             "ownerId": self.owner_id,
+            "ownerName": self.owner_name,
             "expiresAt": self.expires_at.isoformat() if self.expires_at else None,
             "createdAt": self.created_at.isoformat(),
         }

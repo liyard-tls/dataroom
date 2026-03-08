@@ -14,6 +14,7 @@ export interface ShareLink {
   resourceType: 'file' | 'folder'
   resourceId: string
   ownerId: string
+  ownerName: string | null
   expiresAt: string | null
   createdAt: string
 }
