@@ -235,7 +235,7 @@ function FolderRow({
         ) : (
           <span className="truncate text-sm">{folder.name}</span>
         )}
-        {isShared && <Users size={12} className="shrink-0 text-primary/60" />}
+        {isShared && <Users size={14} className="shrink-0 fill-primary/20 text-primary" />}
         <button
           tabIndex={-1}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
@@ -400,7 +400,7 @@ function FileRow({
         ) : (
           <span className="truncate text-sm">{file.name}</span>
         )}
-        {isShared && <Users size={12} className="shrink-0 text-primary/60" />}
+        {isShared && <Users size={14} className="shrink-0 fill-primary/20 text-primary" />}
         <button
           tabIndex={-1}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
@@ -599,7 +599,7 @@ function FolderCard({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {isShared && <Users size={11} className="mr-0.5 text-primary/60" />}
+        {isShared && <Users size={14} className="mr-0.5 fill-primary/20 text-primary" />}
       </div>
 
       {/* Icon */}
@@ -737,7 +737,7 @@ function FileCard({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {isShared && <Users size={11} className="mr-0.5 text-primary/60" />}
+        {isShared && <Users size={14} className="mr-0.5 fill-primary/20 text-primary" />}
       </div>
 
       {/* Icon */}
