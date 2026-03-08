@@ -14,6 +14,7 @@ FIREBASE_AUTH_REQUIRED=true to force verification in all environments.
 import json
 import logging
 import os
+import threading
 
 import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials
@@ -21,6 +22,7 @@ from firebase_admin import auth as firebase_auth, credentials
 logger = logging.getLogger(__name__)
 
 _initialised = False
+_init_lock = threading.Lock()
 
 
 def _init_firebase() -> bool:
@@ -29,24 +31,44 @@ def _init_firebase() -> bool:
     if _initialised:
         return True
 
-    sa_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
-    if not sa_json:
-        logger.warning(
-            "FIREBASE_SERVICE_ACCOUNT_JSON is not set — "
-            "Firebase token verification is DISABLED."
-        )
-        return False
+    with _init_lock:
+        if _initialised:
+            return True
 
-    try:
-        sa_dict = json.loads(sa_json)
-        cred = credentials.Certificate(sa_dict)
-        firebase_admin.initialize_app(cred)
-        _initialised = True
-        logger.info("Firebase Admin SDK initialised (project: %s)", sa_dict.get("project_id"))
-        return True
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Failed to initialise Firebase Admin SDK: %s", exc)
-        return False
+        # Reuse an app initialised elsewhere in the same process.
+        try:
+            firebase_admin.get_app()
+            _initialised = True
+            return True
+        except ValueError:
+            pass
+
+        sa_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
+        if not sa_json:
+            logger.warning(
+                "FIREBASE_SERVICE_ACCOUNT_JSON is not set — "
+                "Firebase token verification is DISABLED."
+            )
+            return False
+
+        try:
+            sa_dict = json.loads(sa_json)
+            cred = credentials.Certificate(sa_dict)
+            firebase_admin.initialize_app(cred)
+            _initialised = True
+            logger.info("Firebase Admin SDK initialised (project: %s)", sa_dict.get("project_id"))
+            return True
+        except ValueError as exc:
+            # Can happen under concurrent first requests; treat as success.
+            if "already exists" in str(exc):
+                _initialised = True
+                logger.info("Firebase Admin SDK already initialised, reusing default app.")
+                return True
+            logger.error("Failed to initialise Firebase Admin SDK: %s", exc)
+            return False
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to initialise Firebase Admin SDK: %s", exc)
+            return False
 
 
 def verify_id_token(id_token: str) -> str | None:
