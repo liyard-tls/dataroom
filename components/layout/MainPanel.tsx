@@ -53,7 +53,6 @@ interface MainPanelProps {
   onFolderDelete: (id: string) => void;
   onFolderCreate: (name: string, parentId: string | null) => void;
   onToggleSelect: (id: string) => void;
-  onRangeSelect: (ids: string[]) => void;
   onSelectAll: () => void;
   sortField?: "name" | "size" | "updatedAt";
   sortDir?: "asc" | "desc";
@@ -796,7 +795,6 @@ export function MainPanel({
   onFolderDelete,
   onFolderCreate: _onFolderCreate,
   onToggleSelect,
-  onRangeSelect,
   onSelectAll: _onSelectAll,
   onClearSelection,
   sortField,
@@ -928,49 +926,6 @@ export function MainPanel({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedId, orderedItems, viewMode, moveNav, onFolderOpen, onOpenFile]);
-  // ──────────────────────────────────────────────────────────────────────────
-
-  // ── Shift/Ctrl click selection ─────────────────────────────────────────────
-  // Anchor for Shift+click range selection
-  const lastSelectedId = useRef<string | null>(null);
-
-  const handleContentClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement;
-      // Skip clicks on checkboxes (they call onToggleSelect directly), buttons, inputs
-      if (target.closest('button') || target.closest('input') || target.closest('[role="checkbox"]')) return;
-      const row = target.closest<HTMLElement>('[data-item-id]');
-      if (!row) return;
-      const id = row.dataset.itemId;
-      if (!id) return;
-
-      if (e.shiftKey && lastSelectedId.current) {
-        // Range select: select all between lastSelectedId and id
-        const anchorIdx = orderedItems.findIndex((item) => item.id === lastSelectedId.current);
-        const targetIdx = orderedItems.findIndex((item) => item.id === id);
-        if (anchorIdx !== -1 && targetIdx !== -1) {
-          const [from, to] = anchorIdx < targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
-          const rangeIds = orderedItems.slice(from, to + 1).map((item) => item.id);
-          onRangeSelect(rangeIds);
-          return;
-        }
-      }
-
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl/Cmd: toggle individual item without clearing others
-        onToggleSelect(id);
-        lastSelectedId.current = id;
-        return;
-      }
-
-      // Plain click: select only this item
-      onClearSelection();
-      onToggleSelect(id);
-      lastSelectedId.current = id;
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orderedItems, onRangeSelect, onToggleSelect, onClearSelection],
-  );
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Rubber-band (marquee) selection ────────────────────────────────────────
@@ -1114,7 +1069,6 @@ export function MainPanel({
         className="relative flex-1 overflow-y-auto py-2 select-none outline-none"
         tabIndex={-1}
         onKeyDown={handleContentKeyDown}
-        onClick={handleContentClick}
         onPointerDown={handleContentPointerDown}
         onPointerMove={handleContentPointerMove}
         onPointerUp={handleContentPointerUp}
