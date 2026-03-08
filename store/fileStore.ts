@@ -19,6 +19,7 @@ interface FileState {
   updateFile: (updated: FileMetadata) => void
   removeFile: (id: string) => void
   removeFiles: (ids: string[]) => void
+  removeSelectedIds: (ids: string[]) => void
   toggleSelection: (id: string) => void
   selectAll: (extraIds?: string[]) => void
   clearSelection: () => void
@@ -58,6 +59,12 @@ export const useFileStore = create<FileState>()((set) => ({
       const selectedIds = new Set(state.selectedIds)
       ids.forEach((id) => selectedIds.delete(id))
       return { files: state.files.filter((f) => !idSet.has(f.id)), selectedIds }
+    }),
+  removeSelectedIds: (ids) =>
+    set((state) => {
+      const selectedIds = new Set(state.selectedIds)
+      ids.forEach((id) => selectedIds.delete(id))
+      return { selectedIds }
     }),
   toggleSelection: (id) =>
     set((state) => {

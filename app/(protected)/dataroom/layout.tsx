@@ -208,6 +208,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     selectAll,
     clearSelection,
     selectedIds,
+    removeSelectedIds,
     removeFile,
     allFiles,
     setAllFiles,
@@ -349,13 +350,23 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     for (const id of folderIds) {
       await deleteFolder(id);
     }
+    removeSelectedIds(folderIds);
     // Delete files via the existing bulk helper
     if (fileIds.length > 0) {
       await deleteSelected(fileIds);
     }
 
     void loadAllFiles();
-  }, [selectedIds, folders, deleteFolder, deleteSelected, loadAllFiles, currentFolderId]);
+  }, [selectedIds, folders, deleteFolder, removeSelectedIds, deleteSelected, loadAllFiles, currentFolderId]);
+
+  const handleDeleteFolder = useCallback(
+    async (id: string) => {
+      invalidateAllFolderCache();
+      await deleteFolder(id);
+      removeSelectedIds([id]);
+    },
+    [deleteFolder, removeSelectedIds],
+  );
 
   const navigateUp = useCallback(() => {
     const current = folders.find((f) => f.id === currentFolderId);
@@ -632,9 +643,8 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
             onRenameFolder={(id, name) => {
               void handleRenameFolder(id, name);
             }}
-            onDeleteFolder={async (id) => {
-              invalidateAllFolderCache();
-              await deleteFolder(id);
+            onDeleteFolder={(id) => {
+              void handleDeleteFolder(id);
             }}
             user={user}
             files={allFiles}
@@ -879,9 +889,8 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               onFolderRename={(id, name) => {
                 void handleRenameFolder(id, name);
               }}
-              onFolderDelete={async (id) => {
-                invalidateAllFolderCache();
-                await deleteFolder(id);
+              onFolderDelete={(id) => {
+                void handleDeleteFolder(id);
               }}
               onFolderCreate={(name, parentId) => {
                 void handleCreateFolder(name, parentId, { startRenaming: true });
