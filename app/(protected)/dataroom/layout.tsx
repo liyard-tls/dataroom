@@ -709,8 +709,9 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               )}
             </Button>
             <div className="h-5 w-px shrink-0 bg-border/100" />
-            <Breadcrumb path={breadcrumbPath} onNavigate={navigate} />
-            <div className="flex-1" />
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <Breadcrumb path={breadcrumbPath} onNavigate={navigate} />
+            </div>
             {selectedIds.size > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
