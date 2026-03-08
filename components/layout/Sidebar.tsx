@@ -445,6 +445,9 @@ export function Sidebar({
       siblingList.push(folder);
       map.set(folder.parentId, siblingList);
     }
+    for (const [key, list] of map) {
+      map.set(key, list.slice().sort((a, b) => a.name.localeCompare(b.name)));
+    }
     return map;
   }, [folders]);
 
