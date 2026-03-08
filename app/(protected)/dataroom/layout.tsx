@@ -704,6 +704,9 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                 </Button>
               </div>
             )}
+            {selectedIds.size > 0 && (
+              <div className="h-5 w-px shrink-0 bg-border/100" />
+            )}
             <Button
               variant="outline"
               size="sm"
