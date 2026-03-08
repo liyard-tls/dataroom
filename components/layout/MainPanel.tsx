@@ -12,6 +12,7 @@ import {
   Eye,
   Star,
   Link,
+  Users,
 } from "lucide-react";
 import { FileMetadata } from "@/types/file.types";
 import { Folder } from "@/types/folder.types";
@@ -53,6 +54,7 @@ interface MainPanelProps {
   onClearSelection: () => void;
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
+  sharedIds: Set<string>;
   viewMode: "list" | "grid";
   onShareFile: (id: string) => void;
   onShareFolder: (id: string) => void;
@@ -107,6 +109,7 @@ function FolderRow({
   isSelected,
   isFocused,
   isFavorite,
+  isShared,
   startRenaming: startRenamingProp,
   onSelect,
   onOpen,
@@ -121,6 +124,7 @@ function FolderRow({
   isSelected: boolean;
   isFocused?: boolean;
   isFavorite: boolean;
+  isShared?: boolean;
   startRenaming?: boolean;
   onSelect: () => void;
   onOpen: () => void;
@@ -224,6 +228,7 @@ function FolderRow({
         ) : (
           <span className="truncate text-sm">{folder.name}</span>
         )}
+        {isShared && <Users size={12} className="shrink-0 text-primary/60" />}
         <button
           tabIndex={-1}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
@@ -299,6 +304,7 @@ function FileRow({
   isSelected,
   isFocused,
   isFavorite,
+  isShared,
   onSelect,
   onOpen,
   onRename,
@@ -310,6 +316,7 @@ function FileRow({
   isSelected: boolean;
   isFocused?: boolean;
   isFavorite: boolean;
+  isShared?: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onRename: (name: string) => void;
@@ -386,6 +393,7 @@ function FileRow({
         ) : (
           <span className="truncate text-sm">{file.name}</span>
         )}
+        {isShared && <Users size={12} className="shrink-0 text-primary/60" />}
         <button
           tabIndex={-1}
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
@@ -465,6 +473,7 @@ function FolderCard({
   isSelected,
   isFocused,
   isFavorite,
+  isShared,
   startRenaming: startRenamingProp,
   onSelect,
   onOpen,
@@ -479,6 +488,7 @@ function FolderCard({
   isSelected: boolean;
   isFocused?: boolean;
   isFavorite: boolean;
+  isShared?: boolean;
   startRenaming?: boolean;
   onSelect: () => void;
   onOpen: () => void;
@@ -544,42 +554,45 @@ function FolderCard({
       </div>
 
       {/* Favorite + menu */}
-      <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
-        <button
-          tabIndex={-1}
-          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className={cn(
-            "rounded p-0.5 transition-colors",
-            isFavorite ? "text-yellow-400" : "text-transparent group-hover:text-muted-foreground/40 hover:!text-yellow-400",
-          )}
-        >
-          <Star size={13} className={cn(isFavorite && "fill-yellow-400")} />
-        </button>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button tabIndex={-1} variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
-              <MoreHorizontal size={13} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={onOpen}><FolderOpen size={14} className="mr-2" /> Open</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setIsRenaming(true); setNameValue(folder.name); }}>
-              <Pencil size={14} className="mr-2" /> Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onToggleFavorite}>
-              <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
-              {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onShare}>
-              <Link size={14} className="mr-2" /> Share
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-              <Trash2 size={14} className="mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1">
+        <div className="flex items-center gap-1">
+          <button
+            tabIndex={-1}
+            onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              "rounded p-0.5 transition-colors",
+              isFavorite ? "text-yellow-400" : "text-transparent group-hover:text-muted-foreground/40 hover:!text-yellow-400",
+            )}
+          >
+            <Star size={13} className={cn(isFavorite && "fill-yellow-400")} />
+          </button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button tabIndex={-1} variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
+                <MoreHorizontal size={13} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={onOpen}><FolderOpen size={14} className="mr-2" /> Open</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setIsRenaming(true); setNameValue(folder.name); }}>
+                <Pencil size={14} className="mr-2" /> Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleFavorite}>
+                <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
+                {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onShare}>
+                <Link size={14} className="mr-2" /> Share
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                <Trash2 size={14} className="mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        {isShared && <Users size={11} className="mr-0.5 text-primary/60" />}
       </div>
 
       {/* Icon */}
@@ -623,6 +636,7 @@ function FileCard({
   isSelected,
   isFocused,
   isFavorite,
+  isShared,
   onSelect,
   onOpen,
   onRename,
@@ -634,6 +648,7 @@ function FileCard({
   isSelected: boolean;
   isFocused?: boolean;
   isFavorite: boolean;
+  isShared?: boolean;
   onSelect: () => void;
   onOpen: () => void;
   onRename: (name: string) => void;
@@ -677,42 +692,45 @@ function FileCard({
       </div>
 
       {/* Favorite + menu */}
-      <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
-        <button
-          tabIndex={-1}
-          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className={cn(
-            "rounded p-0.5 transition-colors",
-            isFavorite ? "text-yellow-400" : "text-transparent group-hover:text-muted-foreground/40 hover:!text-yellow-400",
-          )}
-        >
-          <Star size={13} className={cn(isFavorite && "fill-yellow-400")} />
-        </button>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button tabIndex={-1} variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
-              <MoreHorizontal size={13} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={onOpen}><Eye size={14} className="mr-2" /> Open</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setIsRenaming(true); setNameValue(file.name); }}>
-              <Pencil size={14} className="mr-2" /> Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onToggleFavorite}>
-              <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
-              {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onShare}>
-              <Link size={14} className="mr-2" /> Share
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-              <Trash2 size={14} className="mr-2" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1">
+        <div className="flex items-center gap-1">
+          <button
+            tabIndex={-1}
+            onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              "rounded p-0.5 transition-colors",
+              isFavorite ? "text-yellow-400" : "text-transparent group-hover:text-muted-foreground/40 hover:!text-yellow-400",
+            )}
+          >
+            <Star size={13} className={cn(isFavorite && "fill-yellow-400")} />
+          </button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button tabIndex={-1} variant="ghost" size="icon" className="h-6 w-6" onClick={stopRowPropagation} onPointerDown={stopRowPropagation} onDoubleClick={stopRowPropagation}>
+                <MoreHorizontal size={13} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={onOpen}><Eye size={14} className="mr-2" /> Open</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setIsRenaming(true); setNameValue(file.name); }}>
+                <Pencil size={14} className="mr-2" /> Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleFavorite}>
+                <Star size={14} className={cn("mr-2", isFavorite && "fill-yellow-400 text-yellow-400")} />
+                {isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onShare}>
+                <Link size={14} className="mr-2" /> Share
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                <Trash2 size={14} className="mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        {isShared && <Users size={11} className="mr-0.5 text-primary/60" />}
       </div>
 
       {/* Icon */}
@@ -775,6 +793,7 @@ export function MainPanel({
   onClearSelection,
   favoriteIds,
   onToggleFavorite,
+  sharedIds,
   viewMode,
   childFolders,
   onShareFile,
@@ -1056,6 +1075,7 @@ export function MainPanel({
                 isSelected={selectedIds.has(folder.id)}
                 isFocused={focusedId === folder.id}
                 isFavorite={favoriteIds.has(folder.id)}
+                isShared={sharedIds.has(folder.id)}
                 startRenaming={creatingFolderId === folder.id}
                 onSelect={() => onToggleSelect(folder.id)}
                 onOpen={() => onFolderOpen(folder.id)}
@@ -1073,6 +1093,7 @@ export function MainPanel({
                 isSelected={selectedIds.has(file.id)}
                 isFocused={focusedId === file.id}
                 isFavorite={favoriteIds.has(file.id)}
+                isShared={sharedIds.has(file.id)}
                 onSelect={() => onToggleSelect(file.id)}
                 onOpen={() => onOpenFile(file.id)}
                 onRename={(name) => onRenameFile(file.id, name)}
@@ -1097,6 +1118,7 @@ export function MainPanel({
                 isSelected={selectedIds.has(folder.id)}
                 isFocused={focusedId === folder.id}
                 isFavorite={favoriteIds.has(folder.id)}
+                isShared={sharedIds.has(folder.id)}
                 startRenaming={creatingFolderId === folder.id}
                 onSelect={() => onToggleSelect(folder.id)}
                 onOpen={() => onFolderOpen(folder.id)}
@@ -1114,6 +1136,7 @@ export function MainPanel({
                 isSelected={selectedIds.has(file.id)}
                 isFocused={focusedId === file.id}
                 isFavorite={favoriteIds.has(file.id)}
+                isShared={sharedIds.has(file.id)}
                 onSelect={() => onToggleSelect(file.id)}
                 onOpen={() => onOpenFile(file.id)}
                 onRename={(name) => onRenameFile(file.id, name)}

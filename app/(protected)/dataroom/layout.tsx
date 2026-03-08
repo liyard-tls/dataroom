@@ -75,6 +75,7 @@ import {
 } from "@/modules/files/hooks/useFiles";
 import { uniqueName } from "@/lib/fileHelpers";
 import { ShareModal } from "@/modules/sharing/components/ShareModal";
+import { sharingService } from "@/modules/sharing";
 
 function isFolderDescendant(
   folderId: string,
@@ -126,11 +127,21 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [creatingFolderId, setCreatingFolderId] = useState<string | null>(null);
   const [driveModalOpen, setDriveModalOpen] = useState(false);
+  const [sharedIds, setSharedIds] = useState<Set<string>>(new Set());
   const [shareTarget, setShareTarget] = useState<{
     type: "file" | "folder";
     id: string;
     name: string;
   } | null>(null);
+
+  const loadSharedIds = useCallback(async () => {
+    try {
+      const shares = await sharingService.listAllShares();
+      setSharedIds(new Set(shares.map((s) => s.resourceId)));
+    } catch {
+      // sharing may not be configured — silently ignore
+    }
+  }, []);
   // Pending move that has a name conflict — waits for user confirmation
   type PendingMove =
     | {
@@ -216,6 +227,10 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   } = useFiles(currentFolderId);
 
   // Load folder tree on mount; seed default content if this is a brand-new user
+  useEffect(() => {
+    void loadSharedIds();
+  }, [loadSharedIds]);
+
   useEffect(() => {
     if (!user?.uid) return;
     const key = `dataroom:seeded:${user.uid}`;
@@ -831,6 +846,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               onClearSelection={clearSelection}
               favoriteIds={favoriteIds}
               onToggleFavorite={toggleFavorite}
+              sharedIds={sharedIds}
               viewMode={viewMode}
               onShareFile={(id) => {
                 const file = allFiles.find((f) => f.id === id);
@@ -891,7 +907,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
           resourceType={shareTarget.type}
           resourceId={shareTarget.id}
           resourceName={shareTarget.name}
-          onClose={() => setShareTarget(null)}
+          onClose={() => { setShareTarget(null); void loadSharedIds(); }}
         />
       )}
       {pendingMove && (

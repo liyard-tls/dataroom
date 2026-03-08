@@ -82,6 +82,11 @@ export const sharingService = {
     return apiFetch(`/shares/resource/${resourceType}/${resourceId}`)
   },
 
+  /** List all share links owned by the current user. */
+  async listAllShares(): Promise<ShareLink[]> {
+    return apiFetch('/shares/')
+  },
+
   /** Revoke (delete) a share link. */
   async deleteShare(shareId: string): Promise<void> {
     await apiFetch(`/shares/${shareId}`, { method: 'DELETE' })
