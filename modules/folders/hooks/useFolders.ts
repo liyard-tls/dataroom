@@ -4,21 +4,24 @@ import { useCallback } from 'react'
 import { useFolderStore } from '@/store/folderStore'
 import { useAuth } from '@/modules/auth'
 import { folderService } from '../services/folder.service'
+import { Folder } from '@/types/folder.types'
 import { toast } from 'sonner'
 
 export function useFolders() {
   const { user } = useAuth()
   const { folders, currentFolderId, isLoading, setFolders, addFolder, updateFolder, setCurrentFolderId, setLoading, setError } = useFolderStore()
 
-  const loadFolders = useCallback(async () => {
-    if (!user) return
+  const loadFolders = useCallback(async (): Promise<Folder[]> => {
+    if (!user) return []
     setLoading(true)
     try {
       const data = await folderService.loadFolderTree(user.uid)
       setFolders(data)
+      return data
     } catch {
       setError('Failed to load folders')
       toast.error('Failed to load folders')
+      return []
     } finally {
       setLoading(false)
     }

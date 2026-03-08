@@ -213,10 +213,23 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     moveFile,
   } = useFiles(currentFolderId);
 
-  // Load folder tree on mount
+  // Load folder tree on mount; seed default content if this is a brand-new user
   useEffect(() => {
-    loadFolders();
-  }, [loadFolders]);
+    if (!user?.uid) return;
+    const key = `dataroom:seeded:${user.uid}`;
+    loadFolders().then((loaded) => {
+      // `loaded` is the fetched list — empty only for a truly new user
+      if (loaded.length === 0 && !localStorage.getItem(key)) {
+        localStorage.setItem(key, '1');
+        import('@/modules/onboarding/seed.service')
+          .then(({ seedNewUser }) => seedNewUser(user.uid))
+          .then(() => loadFolders())
+          .then(() => loadFiles())
+          .catch(console.error);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 
   // Reload files when current folder changes
   useEffect(() => {
@@ -287,10 +300,23 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   );
 
   const handleDeleteSelected = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    const folderIds = ids.filter((id) => folders.some((f) => f.id === id));
+    const fileIds = ids.filter((id) => !folderIds.includes(id));
+
     invalidateFolderCache(currentFolderId);
-    await deleteSelected();
+
+    // Delete folders first (cascades their contents server-side)
+    for (const id of folderIds) {
+      await deleteFolder(id);
+    }
+    // Delete files via the existing bulk helper
+    if (fileIds.length > 0) {
+      await deleteSelected(fileIds);
+    }
+
     void loadAllFiles();
-  }, [deleteSelected, loadAllFiles, currentFolderId]);
+  }, [selectedIds, folders, deleteFolder, deleteSelected, loadAllFiles, currentFolderId]);
 
   const navigateUp = useCallback(() => {
     const current = folders.find((f) => f.id === currentFolderId);

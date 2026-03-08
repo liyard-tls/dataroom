@@ -123,8 +123,8 @@ export function useFiles(folderId: string | null) {
     }
   }, [removeFile])
 
-  const deleteSelected = useCallback(async () => {
-    const ids = Array.from(selectedIds)
+  const deleteSelected = useCallback(async (fileIdsOverride?: string[]) => {
+    const ids = fileIdsOverride ?? Array.from(selectedIds)
     if (!ids.length) return
     try {
       await fileService.deleteFiles(ids)
