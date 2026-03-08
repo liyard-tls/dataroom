@@ -22,6 +22,10 @@ up:
 down:
 	docker compose down
 
+restart:
+	docker compose build api
+	docker compose up -d --no-deps api
+
 build:
 	docker compose build api
 

@@ -1,52 +1,52 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { authService } from '../services/auth.service'
-import { toast } from 'sonner'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { authService } from "../services/auth.service";
+import { toast } from "sonner";
 
 export function LoginForm() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   async function handleEmailLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
     try {
-      await authService.signInWithEmail(email, password)
-      router.replace('/dataroom')
+      await authService.signInWithEmail(email, password);
+      router.replace("/dataroom");
     } catch {
-      toast.error('Invalid email or password')
+      toast.error("Invalid email or password");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   async function handleGoogle() {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      await authService.signInWithGoogle()
-      router.replace('/dataroom')
+      await authService.signInWithGoogle();
+      router.replace("/dataroom");
     } catch {
-      toast.error('Google sign-in failed')
+      toast.error("Google sign-in failed");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   async function handleApple() {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      await authService.signInWithApple()
-      router.replace('/dataroom')
+      await authService.signInWithApple();
+      router.replace("/dataroom");
     } catch {
-      toast.error('Apple sign-in failed')
+      toast.error("Apple sign-in failed");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -75,7 +75,7 @@ export function LoginForm() {
           disabled={isLoading}
         />
         <Button type="submit" disabled={isLoading} className="w-full">
-          {isLoading ? 'Signing in...' : 'Sign in'}
+          {isLoading ? "Signing in..." : "Sign in"}
         </Button>
       </form>
 
@@ -86,20 +86,22 @@ export function LoginForm() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <Button variant="outline" onClick={handleGoogle} disabled={isLoading} className="w-full">
+        <Button
+          variant="outline"
+          onClick={handleGoogle}
+          disabled={isLoading}
+          className="w-full"
+        >
           Continue with Google
-        </Button>
-        <Button variant="outline" onClick={handleApple} disabled={isLoading} className="w-full">
-          Continue with Apple
         </Button>
       </div>
 
       <p className="text-center text-sm text-muted-foreground">
-        No account?{' '}
+        No account?{" "}
         <a href="/register" className="text-primary hover:underline">
           Sign up
         </a>
       </p>
     </div>
-  )
+  );
 }
