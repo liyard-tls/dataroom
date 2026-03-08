@@ -13,6 +13,9 @@ import {
   Star,
   Link,
   Users,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { FileMetadata } from "@/types/file.types";
 import { Folder } from "@/types/folder.types";
@@ -52,6 +55,9 @@ interface MainPanelProps {
   onToggleSelect: (id: string) => void;
   onRangeSelect: (ids: string[]) => void;
   onSelectAll: () => void;
+  sortField?: "name" | "size" | "updatedAt";
+  sortDir?: "asc" | "desc";
+  onSort?: (field: "name" | "size" | "updatedAt") => void;
   onClearSelection: () => void;
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
@@ -793,6 +799,9 @@ export function MainPanel({
   onRangeSelect,
   onSelectAll: _onSelectAll,
   onClearSelection,
+  sortField,
+  sortDir,
+  onSort,
   favoriteIds,
   onToggleFavorite,
   sharedIds,
@@ -1074,9 +1083,27 @@ export function MainPanel({
               }}
             />
           </div>
-          <span className={COL_NAME}>Name</span>
-          <span className={COL_SIZE}>Size</span>
-          <span className={COL_DATE}>Modified</span>
+          {(["name", "size", "updatedAt"] as const).map((field) => {
+            const label = { name: "Name", size: "Size", updatedAt: "Modified" }[field];
+            const colClass = field === "name" ? COL_NAME : field === "size" ? COL_SIZE : COL_DATE;
+            const isActive = sortField === field;
+            const Icon = isActive ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+            return (
+              <button
+                key={field}
+                onClick={() => onSort?.(field)}
+                className={cn(
+                  "flex items-center gap-1 transition-colors hover:text-foreground",
+                  colClass,
+                  field !== "name" && "justify-center",
+                  isActive ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {label}
+                <Icon size={12} className={cn(!isActive && "opacity-40")} />
+              </button>
+            );
+          })}
           <span className={COL_ACTIONS} />
         </div>
       )}

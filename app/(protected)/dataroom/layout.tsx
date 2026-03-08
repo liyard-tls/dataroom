@@ -938,6 +938,12 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               onRangeSelect={(ids) => ids.forEach((id) => { if (!selectedIds.has(id)) toggleSelection(id); })}
               onSelectAll={selectAll}
               onClearSelection={clearSelection}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSort={(field) => {
+                if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                else { setSortField(field); setSortDir("asc"); }
+              }}
               favoriteIds={favoriteIds}
               onToggleFavorite={toggleFavorite}
               sharedIds={sharedIds}
