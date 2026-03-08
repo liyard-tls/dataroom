@@ -935,6 +935,7 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
                 void handleCreateFolder(name, parentId, { startRenaming: true });
               }}
               onToggleSelect={toggleSelection}
+              onRangeSelect={(ids) => ids.forEach((id) => { if (!selectedIds.has(id)) toggleSelection(id); })}
               onSelectAll={selectAll}
               onClearSelection={clearSelection}
               favoriteIds={favoriteIds}
