@@ -13,6 +13,8 @@ interface UseGlobalHotkeysOptions {
   onNavigateUp: () => void
   onImportFromDrive?: () => void
   searchInputRef: RefObject<HTMLInputElement | null>
+  mainContentRef: RefObject<HTMLElement | null>
+  arrowNavRef: RefObject<((direction: 'up' | 'down') => void) | null>
 }
 
 export const NEW_FOLDER_HOTKEY = 'ctrl+shift+f, meta+shift+f'
@@ -25,6 +27,8 @@ export function useGlobalHotkeys({
   onNavigateUp,
   onImportFromDrive,
   searchInputRef,
+  mainContentRef,
+  arrowNavRef,
 }: UseGlobalHotkeysOptions) {
   const { closeViewer, viewerFile, toggleSidebar } = useUIStore()
   const { selectedIds, clearSelection } = useFileStore()
@@ -103,5 +107,26 @@ export function useGlobalHotkeys({
       },
     },
     [onNavigateUp],
+  )
+
+  // Arrow keys — focus MainPanel and immediately trigger item navigation
+  useHotkeys(
+    'up, down',
+    (e) => {
+      mainContentRef.current?.focus()
+      arrowNavRef.current?.(e.key === 'ArrowUp' ? 'up' : 'down')
+    },
+    {
+      preventDefault: true,
+      ignoreEventWhen: (e) => {
+        const target = e.target as HTMLElement
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+        if (tag === 'BUTTON') return true
+        if (mainContentRef.current?.contains(target)) return true
+        return false
+      },
+    },
+    [mainContentRef, arrowNavRef],
   )
 }

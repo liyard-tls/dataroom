@@ -61,6 +61,10 @@ interface MainPanelProps {
   // Set this to focus a specific item via keyboard (e.g. after search navigation)
   focusItemId?: string | null;
   onFocusItemConsumed?: () => void;
+  // Ref forwarded to the scrollable content div for external focus control (e.g. arrow-key hotkeys)
+  contentRef?: React.RefObject<HTMLDivElement | null>;
+  // Ref that MainPanel writes its current moveNav fn into, so global hotkeys can call it
+  arrowNavRef?: React.RefObject<((direction: 'up' | 'down') => void) | null>;
 }
 
 // Shared column widths — identical in header and every row
@@ -779,6 +783,8 @@ export function MainPanel({
   onCreatingFolderEnd,
   focusItemId,
   onFocusItemConsumed,
+  contentRef: externalContentRef,
+  arrowNavRef,
 }: MainPanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -847,54 +853,51 @@ export function MainPanel({
     contentRef.current?.focus();
   }, [focusItemId, orderedItems, onFocusItemConsumed]);
 
-  const handleContentKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Don't intercept if focus is inside an input (rename)
-    if ((e.target as HTMLElement).tagName === 'INPUT') return;
-
+  const moveNav = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     const total = orderedItems.length;
     if (total === 0) return;
-
     const currentIndex = focusedId ? orderedItems.findIndex((item) => item.id === focusedId) : -1;
-
-    // Compute how many columns are visible (grid mode)
     let cols = 1;
     if (viewMode === 'grid' && contentRef.current) {
       const firstEl = contentRef.current.querySelector<HTMLElement>('[data-item-id]');
       const container = firstEl?.parentElement;
-      if (firstEl && container) {
-        cols = Math.round(container.offsetWidth / firstEl.offsetWidth) || 1;
-      }
+      if (firstEl && container) cols = Math.round(container.offsetWidth / firstEl.offsetWidth) || 1;
     }
-
     let nextIndex = currentIndex;
+    if (direction === 'down') nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + cols, total - 1);
+    else if (direction === 'up') nextIndex = currentIndex < 0 ? 0 : Math.max(currentIndex - cols, 0);
+    else if (direction === 'right') nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, total - 1);
+    else if (direction === 'left') nextIndex = currentIndex < 0 ? 0 : Math.max(currentIndex - 1, 0);
+    setFocusedId(orderedItems[nextIndex]?.id ?? null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedId, orderedItems, viewMode]);
 
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + cols, total - 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      nextIndex = currentIndex < 0 ? 0 : Math.max(currentIndex - cols, 0);
-    } else if (e.key === 'ArrowRight' && viewMode === 'grid') {
-      e.preventDefault();
-      nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, total - 1);
-    } else if (e.key === 'ArrowLeft' && viewMode === 'grid') {
-      e.preventDefault();
-      nextIndex = currentIndex < 0 ? 0 : Math.max(currentIndex - 1, 0);
-    } else if (e.key === 'Enter') {
+  // Keep arrowNavRef current so global hotkeys can call moveNav without stale closure
+  useEffect(() => {
+    if (arrowNavRef) {
+      (arrowNavRef as React.MutableRefObject<typeof moveNav>).current = moveNav;
+    }
+  });
+
+  const handleContentKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    const total = orderedItems.length;
+    if (total === 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveNav('down'); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveNav('up'); }
+    else if (e.key === 'ArrowRight' && viewMode === 'grid') { e.preventDefault(); moveNav('right'); }
+    else if (e.key === 'ArrowLeft' && viewMode === 'grid') { e.preventDefault(); moveNav('left'); }
+    else if (e.key === 'Enter') {
       e.preventDefault();
       if (focusedId) {
+        const currentIndex = orderedItems.findIndex((item) => item.id === focusedId);
         const item = orderedItems[currentIndex];
         if (item?.type === 'folder') onFolderOpen(item.id);
         else if (item?.type === 'file') onOpenFile(item.id);
       }
-      return;
-    } else {
-      return;
     }
-
-    setFocusedId(orderedItems[nextIndex]?.id ?? null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusedId, orderedItems, viewMode, onFolderOpen, onOpenFile]);
+  }, [focusedId, orderedItems, viewMode, moveNav, onFolderOpen, onOpenFile]);
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Rubber-band (marquee) selection ────────────────────────────────────────
@@ -904,6 +907,13 @@ export function MainPanel({
   // Track which IDs are currently rubber-band-selected so we can diff on each move
   const rubberSelected = useRef<Set<string>>(new Set());
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Forward contentRef to parent so it can programmatically focus the panel
+  useEffect(() => {
+    if (externalContentRef) {
+      (externalContentRef as { current: HTMLDivElement | null }).current = contentRef.current;
+    }
+  });
 
   const handleContentPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1010,7 +1020,7 @@ export function MainPanel({
       {/* Content */}
       <div
         ref={contentRef}
-        className="relative flex-1 overflow-y-auto py-2 select-none"
+        className="relative flex-1 overflow-y-auto py-2 select-none outline-none"
         tabIndex={-1}
         onKeyDown={handleContentKeyDown}
         onPointerDown={handleContentPointerDown}

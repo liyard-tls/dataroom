@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
@@ -121,6 +121,8 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const mainContentRef = useRef<HTMLElement | null>(null);
+  const arrowNavRef = useRef<((direction: 'up' | 'down') => void) | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [creatingFolderId, setCreatingFolderId] = useState<string | null>(null);
   const [driveModalOpen, setDriveModalOpen] = useState(false);
@@ -320,7 +322,10 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
 
   const navigateUp = useCallback(() => {
     const current = folders.find((f) => f.id === currentFolderId);
-    navigate(current?.parentId ?? null);
+    if (!current) return;
+    // Focus the folder we're leaving so the user can see where they came from
+    setFocusItemId(current.id);
+    navigate(current.parentId ?? null);
   }, [folders, currentFolderId, navigate]);
 
   const breadcrumbPath = buildBreadcrumb(folders, currentFolderId);
@@ -373,6 +378,8 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
     onNavigateUp: navigateUp,
     onImportFromDrive: () => setDriveModalOpen(true),
     searchInputRef,
+    mainContentRef,
+    arrowNavRef,
   });
 
   const sensors = useSensors(
@@ -833,6 +840,8 @@ function DataRoomApp({ children }: { children: React.ReactNode }) {
               onCreatingFolderEnd={() => setCreatingFolderId(null)}
               focusItemId={focusItemId}
               onFocusItemConsumed={() => setFocusItemId(null)}
+              contentRef={mainContentRef as React.RefObject<HTMLDivElement | null>}
+              arrowNavRef={arrowNavRef}
               onShareFolder={(id) => {
                 const folder = folders.find((f) => f.id === id);
                 if (folder)
