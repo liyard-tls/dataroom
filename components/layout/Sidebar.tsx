@@ -23,7 +23,6 @@ import { FileIcon } from "@/components/common/FileIcon";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { KbdShortcut } from "@/components/common/KbdShortcut";
 
 interface SidebarProps {
   folders: Folder[];
@@ -446,7 +445,10 @@ export function Sidebar({
       map.set(folder.parentId, siblingList);
     }
     for (const [key, list] of map) {
-      map.set(key, list.slice().sort((a, b) => a.name.localeCompare(b.name)));
+      map.set(
+        key,
+        list.slice().sort((a, b) => a.name.localeCompare(b.name)),
+      );
     }
     return map;
   }, [folders]);
@@ -531,9 +533,9 @@ export function Sidebar({
         {/* Quick actions */}
         <div>
           <span className="text-sm font-medium tracking-wide text-muted-foreground">
-            Quick Actions
+            Add files
           </span>
-          <div className="mt-5 space-y-2">
+          <div className="mt-3 flex gap-2">
             <input
               ref={uploadInputRef}
               type="file"
@@ -543,24 +545,26 @@ export function Sidebar({
             />
             <Button
               variant="outline"
-              className="h-10 w-full justify-start rounded-lg px-3 backdrop-blur-md"
+              className="flex h-16 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl px-2 backdrop-blur-md"
               onClick={() => uploadInputRef.current?.click()}
               title="Upload files (Ctrl+U)"
             >
-              <Upload size={15} className="mr-2" />
-              Upload files
-              <KbdShortcut keys={["ctrl", "u"]} />
+              <Upload size={16} />
+              <span className="text-[11px] font-medium leading-none">
+                Upload
+              </span>
             </Button>
             {onImportFromDrive && (
               <Button
                 variant="outline"
-                className="h-10 w-full justify-start rounded-lg px-3 backdrop-blur-md"
+                className="flex h-16 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl px-2 backdrop-blur-md"
                 onClick={onImportFromDrive}
                 title="Import from Google Drive (Ctrl+Shift+G)"
               >
-                <HardDriveDownload size={15} className="mr-2" />
-                Import from Drive
-                <KbdShortcut keys={["ctrl", "shift", "g"]} />
+                <HardDriveDownload size={16} />
+                <span className="text-[11px] font-medium leading-none">
+                  Import
+                </span>
               </Button>
             )}
           </div>
