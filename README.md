@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Data Room
+
+A virtual data room for secure document management. Client-side SPA with a swappable storage backend.
+
+## Live Demo
+
+**[dataroom.liyard.cloud](https://dataroom.liyard.cloud)**
 
 ## Getting Started
 
-First, run the development server:
+### Frontend
 
 ```bash
+cp .env.example .env.local
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Backend
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cd backend
+cp .env.example .env
+docker compose up -d        # PostgreSQL + Flask on port 5001
+# or
+make up
+```
 
-## Learn More
+Or manually:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+flask db upgrade
+flask run --port 5001
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tests
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run test
+```
 
-## Deploy on Vercel
+## Features
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Folder tree with nested navigation and breadcrumbs
+- File upload via drag-and-drop or button (20 MB limit)
+- List and grid view with sortable columns
+- Google Drive import via OAuth2
+- Public share links (UUID token, optional expiry, read-only page)
+- File viewer: PDF (paginated), images, video, text/markdown
+- Favorites, full-text search with debounce
+- Multi-select: checkboxes, rubber-band drag
+- Context menu with rename, move, delete, share
+- Light/dark theme
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Stack
+
+**Frontend** — Next.js 16 · React 19 · TypeScript · Tailwind v4 · Zustand · Firebase Auth · @dnd-kit · Framer Motion
+
+**Backend** — Flask · PostgreSQL · SQLAlchemy · Alembic
+
+## Architecture
+
+Storage access is behind a `StorageAdapter` interface — swap backends by changing one config variable:
+
+```
+NEXT_PUBLIC_STORAGE_ADAPTER=flask      # production (Flask REST API)
+NEXT_PUBLIC_STORAGE_ADAPTER=indexeddb  # local dev (browser IndexedDB)
+```
+
+Files are stored on disk at `uploads/{owner_id}/{file_id}/{filename}`. PostgreSQL stores only metadata. Google Drive OAuth tokens are Fernet-encrypted at rest.
+
+## Deploy
+
+Frontend → Vercel (set env vars in project settings).
+
+Backend → any Docker host. The `backend/docker-compose.yml` runs PostgreSQL + Flask with persistent volumes.
