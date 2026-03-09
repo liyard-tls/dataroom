@@ -1,7 +1,7 @@
 # Data Room
 A virtual data room for secure document management. Client-side SPA with a swappable storage backend.
 
-<img width="2556" height="1319" alt="image" src="https://github.com/user-attachments/assets/0c603556-6295-4e7d-8569-0550f533aee3" />
+<img width="2553" height="1316" alt="image" src="https://github.com/user-attachments/assets/5dfa93c2-77d9-4e8e-9fdf-a1e6988dc6cc" />
 
 ## Live Demo
 **[dataroom.liyard.cloud](https://dataroom.liyard.cloud)**
@@ -71,11 +71,6 @@ npm run test
 ## Architecture
 
 Storage access is behind a `StorageAdapter` interface — swap backends by changing one config variable:
-
-```
-NEXT_PUBLIC_STORAGE_ADAPTER=flask      # production (Flask REST API)
-NEXT_PUBLIC_STORAGE_ADAPTER=indexeddb  # local dev (browser IndexedDB)
-```
 
 Files are stored on disk at `uploads/{owner_id}/{file_id}/{filename}`. PostgreSQL stores only metadata. Google Drive OAuth tokens are Fernet-encrypted at rest.
 
