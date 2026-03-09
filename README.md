@@ -1,7 +1,7 @@
 # Data Room
 A virtual data room for secure document management. Client-side SPA with a swappable storage backend.
 
-<img width="2553" height="1316" alt="image" src="https://github.com/user-attachments/assets/5dfa93c2-77d9-4e8e-9fdf-a1e6988dc6cc" />
+<img width="2550" height="1314" alt="image" src="https://github.com/user-attachments/assets/253d330c-5e8b-4e1d-9164-eb109e679dd5" />
 
 ## Live Demo
 **[dataroom.liyard.cloud](https://dataroom.liyard.cloud)**
